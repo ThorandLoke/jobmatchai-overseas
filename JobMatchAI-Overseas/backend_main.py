@@ -4294,6 +4294,14 @@ async def beta_page():
     """Beta 测试页面"""
     return FileResponse(os.path.join(FRONTEND_DIR, "beta.html"))
 
+@app.get("/admin")
+async def admin_page():
+    """管理后台页面"""
+    admin_path = os.path.join(BASE_DIR, "admin.html")
+    if os.path.exists(admin_path):
+        return FileResponse(admin_path)
+    return {"error": "Admin page not found"}
+
 @app.get("/health")
 async def health_check():
     """健康检查"""
