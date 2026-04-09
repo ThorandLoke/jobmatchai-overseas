@@ -4286,8 +4286,33 @@ FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 
 @app.get("/")
 async def root():
-    """主页"""
+    """API 根路径 - 返回 API 信息"""
+    return {
+        "service": "JobMatchAI API",
+        "version": "2.0.0",
+        "endpoints": {
+            "health": "/health",
+            "frontend": "/app",
+            "analyze": "/analyze",
+            "jobs_search": "/jobs/search",
+            "cover_letter": "/cover-letter"
+        }
+    }
+
+@app.get("/app")
+async def app_page():
+    """前端页面 - 语言选择"""
     return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
+@app.get("/app-en")
+async def app_en_page():
+    """前端页面 - 英文版"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-en.html"))
+
+@app.get("/app-zh")
+async def app_zh_page():
+    """前端页面 - 中文版"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-zh.html"))
 
 @app.get("/beta.html")
 async def beta_page():
