@@ -775,7 +775,7 @@ def read_beta_page():
 @app.get("/en")
 def read_english_page():
     """返回英文版页面"""
-    en_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en.html")
+    en_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en-final.html")
     if os.path.exists(en_path):
         return FileResponse(en_path)
     return {"error": "English page not found"}
@@ -4306,8 +4306,8 @@ async def app_page():
 
 @app.get("/app-en")
 async def app_en_page():
-    """前端页面 - 英文版"""
-    return FileResponse(os.path.join(FRONTEND_DIR, "index-en.html"))
+    """Frontend page - English version"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-en-final.html"))
 
 @app.get("/app-zh")
 async def app_zh_page():
