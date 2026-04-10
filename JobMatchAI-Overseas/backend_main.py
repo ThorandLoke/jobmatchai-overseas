@@ -784,12 +784,8 @@ def search_china(keyword: str, location: str = "", limit: int = 10) -> List[Dict
 
 # === 启动时初始化IP地理数据库 ===
 import ip_geo
-_xdb_path = os.path.join(os.path.dirname(__file__), "data", "ip2region.xdb")
-if os.path.exists(_xdb_path):
-    ip_geo.init(_xdb_path)
-    print(f"✅ IP地理数据库已加载: {_xdb_path}")
-else:
-    print(f"⚠️ IP地理数据库不存在: {_xdb_path}，将使用默认语言")
+ip_geo.init()  # 使用内置的中国IP段数据库
+print(f"✅ IP地理数据库已加载（{len(ip_geo._CHINA_IP_RANGES)} 个IP段）")
 
 
 @app.get("/")
