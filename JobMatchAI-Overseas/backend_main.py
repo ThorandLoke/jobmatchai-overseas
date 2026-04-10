@@ -682,6 +682,96 @@ def search_sweden(keyword: str, location: str = "", limit: int = 10) -> List[Dic
         print(f"Jobtechdev API Error: {e}")
         return []
 
+# 丹麦 Jobinsats API
+JOBINSATS_API_KEY = os.environ.get("JOBINSATS_API_KEY", "00e043b3fc3a0d9ab5eb956ed644f113c3856175fc96fd54")
+JOBINSATS_BASE = "https://jobindsats.dk/api/v1"
+
+def search_denmark(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
+    """搜索丹麦职位 - Jobinsats API"""
+    url = f"{JOBINSATS_BASE}/stillingsopslag"
+    params = {
+        "q": keyword,
+        "size": min(limit, 50)
+    }
+    if location:
+        params["place"] = location
+    
+    headers = {
+        "Authorization": f"Bearer {JOBINSATS_API_KEY}",
+        "Accept": "application/json"
+    }
+    
+    try:
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        if r.status_code != 200:
+            print(f"Jobinsats API Error: {r.status_code} - {r.text[:200]}")
+            return []
+        
+        data = r.json()
+        jobs = []
+        
+        # Jobinsats 返回格式
+        for j in data.get("stillingsopslag", [])[:limit]:
+            jobs.append({
+                "title": j.get("titel", ""),
+                "company": j.get("arbejdsgiver", {}).get("navn", "N/A") if isinstance(j.get("arbejdsgiver"), dict) else str(j.get("arbejdsgiver", "N/A")),
+                "location": j.get("arbejdssted", {}).get("adresse", "") if isinstance(j.get("arbejdssted"), dict) else str(j.get("arbejdssted", "")),
+                "description": j.get("bruttoarbejdstid", ""),
+                "url": j.get("self", ""),
+                "date": j.get("publiceringsdato", "")[:10] if j.get("publiceringsdato") else "",
+                "source": "🇩🇰 Jobinsats",
+                "language": "da"
+            })
+        return jobs
+    except Exception as e:
+        print(f"Jobinsats API Error: {e}")
+        return []
+
+# 美国 USAJOBS API
+USAJOBS_API_KEY = os.environ.get("USAJOBS_API_KEY", "UiuR7SrGKS0sj3eFFKOFqnACxbc4+oUjPuvLRiY38nU=")
+USAJOBS_BASE = "https://data.usajobs.gov/api/search"
+
+def search_usa(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
+    """搜索美国职位 - USAJOBS API"""
+    url = USAJOBS_BASE
+    params = {
+        "Keyword": keyword,
+        "ResultsPerPage": min(limit, 25)
+    }
+    if location:
+        params["LocationName"] = location
+    
+    headers = {
+        "Authorization-Key": USAJOBS_API_KEY,
+        "User-Agent": "JobMatchAI/1.0 (wei.li@outlook.dk)"
+    }
+    
+    try:
+        r = requests.get(url, params=params, headers=headers, timeout=15)
+        if r.status_code != 200:
+            print(f"USAJOBS API Error: {r.status_code} - {r.text[:200]}")
+            return []
+        
+        data = r.json()
+        jobs = []
+        
+        for j in data.get("SearchResult", {}).get("SearchResultItems", [])[:limit]:
+            src = j.get("MatchedObjectDescriptor", {})
+            jobs.append({
+                "title": src.get("Title", ""),
+                "company": src.get("OrganizationName", "N/A"),
+                "location": src.get("LocationName", ""),
+                "description": src.get("UserArea", {}).get("Details", "")[:500] if src.get("UserArea", {}).get("Details") else "",
+                "url": src.get("PositionURI", ""),
+                "date": src.get("PublicationStartDate", "")[:10] if src.get("PublicationStartDate") else "",
+                "source": "🇺🇸 USAJOBS",
+                "language": "en"
+            })
+        return jobs
+    except Exception as e:
+        print(f"USAJOBS API Error: {e}")
+        return []
+
 # === 中国职位搜索（演示数据）===
 # 注意：中国主流招聘平台（前程无忧、智联、Boss直聘）均无公开免费API
 # 政府网站（人社部公共招聘网）也无开放接口
@@ -1177,6 +1267,8 @@ async def search_jobs(
     - be: 比利时 (Adzuna)
     - de: 德国 (Arbeitsagentur)
     - se: 瑞典 (Jobtechdev)
+    - dk: 丹麦 (Jobinsats)
+    - us: 美国 (USAJOBS)
     - cn: 中国 (演示数据)
     """
     all_jobs = []
@@ -1192,6 +1284,10 @@ async def search_jobs(
             all_jobs.extend(search_germany(keyword, location, limit))
             # 瑞典
             all_jobs.extend(search_sweden(keyword, location, limit))
+            # 丹麦
+            all_jobs.extend(search_denmark(keyword, location, limit))
+            # 美国
+            all_jobs.extend(search_usa(keyword, location, limit))
         elif country in ["gb", "au", "ca", "fr", "nl", "be"]:
             # Adzuna 国家
             all_jobs.extend(search_adzuna(keyword, country, location, limit))
@@ -1201,6 +1297,12 @@ async def search_jobs(
         elif country == "se":
             # 瑞典
             all_jobs.extend(search_sweden(keyword, location, limit))
+        elif country == "dk":
+            # 丹麦
+            all_jobs.extend(search_denmark(keyword, location, limit))
+        elif country == "us":
+            # 美国
+            all_jobs.extend(search_usa(keyword, location, limit))
         elif country == "cn":
             # 中国（演示数据）
             all_jobs.extend(search_china(keyword, location, limit))
@@ -1231,6 +1333,8 @@ def get_job_sources():
             {"id": "be", "name": "比利时", "flag": "🇧🇪", "api": "Adzuna"},
             {"id": "de", "name": "德国", "flag": "🇩🇪", "api": "Arbeitsagentur"},
             {"id": "se", "name": "瑞典", "flag": "🇸🇪", "api": "Jobtechdev"},
+            {"id": "dk", "name": "丹麦", "flag": "🇩🇰", "api": "Jobinsats"},
+            {"id": "us", "name": "美国", "flag": "🇺🇸", "api": "USAJOBS"},
         ]
     }
 

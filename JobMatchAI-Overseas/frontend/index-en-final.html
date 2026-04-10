@@ -525,6 +525,44 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     <h4 style="color: #00d4ff; margin-bottom: 10px;">📁 DoneSavePosition</h4>
                     <div id="jobsList"></div>
                 </div>
+                
+                <!-- PositionSearch Function -->
+                <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(100,200,100,0.1)); border-radius: 12px; border: 1px solid rgba(0,212,255,0.3);">
+                    <h3 style="color: #00d4ff; margin-bottom: 12px;">🔍 SearchMorePositions</h3>
+                    <p style="color: #ccc; font-size: 0.85rem; margin-bottom: 12px;">Searchpositions from multiple countries</p>
+                    
+                    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                        <input type="text" id="jobSearchKeyword" placeholder="Keywords, e.g.: ERP, Dynamics AX, NetSuite" style="flex: 2; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.4); background: rgba(0,0,0,0.3); color: #fff;">
+                        <select id="jobSearchCountry" style="flex: 1; min-width: 120px; padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.4); background: rgba(0,0,0,0.3); color: #fff;">
+                            <option value="all">🌐 All Countries</option>
+                            <option value="dk">🇩🇰 Denmark</option>
+                            <option value="se">🇸🇪 Sweden</option>
+                            <option value="de">🇩🇪 Germany</option>
+                            <option value="us">🇺🇸 USA</option>
+                            <option value="gb">🇬🇧 UK</option>
+                            <option value="nl">🇳🇱 Netherlands</option>
+                            <option value="au">🇦🇺 Australia</option>
+                            <option value="ca">🇨🇦 Canada</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="searchJobs()" style="flex: 0; white-space: nowrap;">
+                            🔍 Search
+                        </button>
+                    </div>
+                    
+                    <div id="jobSearchLoading" class="hidden" style="text-align: center; padding: 20px;">
+                        <span style="color: #00d4ff;">Searching...</span>
+                    </div>
+                    
+                    <div id="jobSearchResults" class="hidden" style="margin-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <span id="jobSearchCount" style="color: #ccc; font-size: 0.85rem;"></span>
+                            <button onclick="clearJobSearch()" style="background: none; border: none; color: #888; cursor: pointer; font-size: 0.85rem;">✕ Clear</button>
+                        </div>
+                        <div id="jobSearchList"></div>
+                    </div>
+                    
+                    <div id="jobSearchError" class="hidden" style="padding: 12px; background: rgba(255,0,0,0.1); border-radius: 8px; color: #ff6b6b; font-size: 0.85rem; margin-top: 12px;"></div>
+                </div>
             </div>
         </div>
         
@@ -5300,6 +5338,114 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 console.log('ℹ️ Backend API not available. Visit https://api.job-match-ai.com/app-en for full features');
             }
         })();
+        
+        // PositionSearch Function
+        async function searchJobs() {
+            const keyword = document.getElementById('jobSearchKeyword').value.trim();
+            const country = document.getElementById('jobSearchCountry').value;
+            
+            if (!keyword) {
+                document.getElementById('jobSearchError').textContent = 'Please enter search keywords';
+                document.getElementById('jobSearchError').classList.remove('hidden');
+                return;
+            }
+            
+            const loadingEl = document.getElementById('jobSearchLoading');
+            const resultsEl = document.getElementById('jobSearchResults');
+            const errorEl = document.getElementById('jobSearchError');
+            const countEl = document.getElementById('jobSearchCount');
+            const listEl = document.getElementById('jobSearchList');
+            
+            loadingEl.classList.remove('hidden');
+            resultsEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`/jobs/search?keyword=${encodeURIComponent(keyword)}&country=${country}&limit=15`);
+                const data = await response.json();
+                
+                loadingEl.classList.add('hidden');
+                
+                if (data.success && data.jobs && data.jobs.length > 0) {
+                    countEl.textContent = `Found ${data.count} positions`;
+                    listEl.innerHTML = data.jobs.slice(0, 15).map(job => `
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid rgba(0,212,255,0.2);">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                <div>
+                                    <div style="color: #fff; font-weight: 600; margin-bottom: 2px;">${job.title || 'Position'}</div>
+                                    <div style="color: #00d4ff; font-size: 0.85rem;">${job.company || 'Company'}</div>
+                                </div>
+                                <span style="font-size: 0.8rem; padding: 2px 8px; background: rgba(0,212,255,0.2); border-radius: 10px; white-space: nowrap;">${job.source || ''}</span>
+                            </div>
+                            <div style="color: #999; font-size: 0.8rem; margin-bottom: 10px;">
+                                📍 ${job.location || 'Unknown'} · ${job.date || 'Date unknown'}
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-secondary" onclick='useSearchedJob(${JSON.stringify(job).replace(/'/g, "\\'").replace(/\"/g, "'")})' style="flex: 1; font-size: 0.85rem;">
+                                    ✨ Apply This Position
+                                </button>
+                                ${job.url ? `<a href="${job.url}" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; text-decoration: none;">🔗 View Original</a>` : ''}
+                            </div>
+                        </div>
+                    `).join('');
+                    resultsEl.classList.remove('hidden');
+                } else {
+                    errorEl.textContent = `No positions found for "${keyword}"`;
+                    errorEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                loadingEl.classList.add('hidden');
+                errorEl.textContent = 'Search failed, please try again';
+                errorEl.classList.remove('hidden');
+                console.error('Job search error:', e);
+            }
+        }
+        
+        // UseSearchedPosition
+        function useSearchedJob(job) {
+            if (!job) return;
+            
+            // SaveTo globalVariable
+            window.currentTargetJob = {
+                title: job.title || 'Position',
+                company: job.company || 'Company',
+                description: job.description || '',
+                source: job.source || 'Search',
+                url: job.url || ''
+            };
+            
+            // SyncTo inputArea
+            document.getElementById('searchJobTitle').value = job.title || '';
+            document.getElementById('searchCompany').value = job.company || '';
+            document.getElementById('searchJobDesc').value = job.description || '';
+            
+            // Addto savedJobs
+            const jobObj = {
+                id: Date.now(),
+                title: job.title || 'Position',
+                company: job.company || 'Company',
+                description: job.description || '',
+                language: 'en',
+                source: job.source || 'Search',
+                url: job.url || '',
+                savedAt: new Date().toLocaleString()
+            };
+            savedJobs.push(jobObj);
+            renderSavedJobs();
+            
+            // HintUser
+            showToast(`✅ Selected "${job.title}", ready to generate cover letter!`);
+            
+            // ScrollTo page top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // ClearSearchResults
+        function clearJobSearch() {
+            document.getElementById('jobSearchKeyword').value = '';
+            document.getElementById('jobSearchResults').classList.add('hidden');
+            document.getElementById('jobSearchError').classList.add('hidden');
+        }
     </script>
 </body>
 </html>
