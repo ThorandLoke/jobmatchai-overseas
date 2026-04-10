@@ -4091,20 +4091,94 @@ class TranslateResumeRequest(BaseModel):
     target_lang: str  # 目标语言: zh, en, da
 
 def translate_resume_with_ai(resume_text: str, source_lang: str, target_lang: str) -> str:
-    """使用 AI 翻译简历到目标语言"""
-    if not AI_AVAILABLE:
-        return None
+    """使用 AI 翻译简历到目标语言（AI不可用时使用后备翻译）"""
     
-    lang_names = {
-        'zh': '中文',
-        'en': 'English',
-        'da': 'Dansk (Danish)'
+    # 常用简历术语对照表
+    TERM_TRANSLATIONS = {
+        ('zh', 'en'): {
+            '个人信息': 'Personal Information',
+            '姓名': 'Name',
+            '邮箱': 'Email',
+            '电话': 'Phone',
+            '地址': 'Address',
+            '教育背景': 'Education',
+            '工作经验': 'Work Experience',
+            '工作经历': 'Work Experience',
+            '项目经验': 'Project Experience',
+            '项目经历': 'Project Experience',
+            '技能特长': 'Skills',
+            '专业技能': 'Professional Skills',
+            '自我评价': 'Self Summary',
+            '求职意向': 'Career Objective',
+            '证书': 'Certificates',
+            '语言能力': 'Language Skills',
+            '培训经历': 'Training',
+            '公司简介': 'Company Description',
+        },
+        ('en', 'zh'): {
+            'personal information': '个人信息',
+            'education': '教育背景',
+            'work experience': '工作经验',
+            'skills': '技能特长',
+            'summary': '自我评价',
+            'objective': '求职意向',
+            'experience': '经历',
+            'project': '项目',
+        },
+        ('zh', 'da'): {
+            '个人信息': 'Personlige Oplysninger',
+            '姓名': 'Navn',
+            '邮箱': 'E-mail',
+            '电话': 'Telefon',
+            '教育背景': 'Uddannelse',
+            '工作经验': 'Arbejdserfaring',
+            '工作经历': 'Arbejdserfaring',
+            '项目经验': 'Projekterfaring',
+            '技能特长': 'Kompetencer',
+            '自我评价': 'Profil',
+        },
+        ('en', 'da'): {
+            'personal information': 'Personlige Oplysninger',
+            'name': 'Navn',
+            'email': 'E-mail',
+            'phone': 'Telefon',
+            'education': 'Uddannelse',
+            'work experience': 'Arbejdserfaring',
+            'skills': 'Kompetencer',
+            'summary': 'Profil',
+            'experience': 'Erfaring',
+            'project': 'Projekt',
+        },
+        ('da', 'en'): {
+            'personlige oplysninger': 'Personal Information',
+            'navn': 'Name',
+            'e-mail': 'Email',
+            'telefon': 'Phone',
+            'uddannelse': 'Education',
+            'arbejdserfaring': 'Work Experience',
+            'kompetencer': 'Skills',
+            'profil': 'Summary',
+        },
+        ('da', 'zh'): {
+            'personlige oplysninger': '个人信息',
+            'navn': '姓名',
+            'uddannelse': '教育背景',
+            'arbejdserfaring': '工作经验',
+        }
     }
     
-    source_name = lang_names.get(source_lang, source_lang)
-    target_name = lang_names.get(target_lang, target_lang)
-    
-    prompt = f"""You are a professional resume translator. Translate the following resume from {source_name} to {target_name}.
+    # 如果AI可用，使用AI翻译
+    if AI_AVAILABLE:
+        lang_names = {
+            'zh': '中文',
+            'en': 'English',
+            'da': 'Dansk (Danish)'
+        }
+        
+        source_name = lang_names.get(source_lang, source_lang)
+        target_name = lang_names.get(target_lang, target_lang)
+        
+        prompt = f"""You are a professional resume translator. Translate the following resume from {source_name} to {target_name}.
 
 Requirements:
 1. Maintain professional resume format and structure
@@ -4118,24 +4192,38 @@ Resume to translate:
 
 Return ONLY the translated resume text, nothing else."""
 
-    try:
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_RESUME or AI_MODEL,
-            messages=[
-                {"role": "system", "content": f"You are a professional resume translator specializing in {source_name} to {target_name} translation."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
-            max_tokens=3000,
-            timeout=60
-        )
-        
-        content = response.choices[0].message.content.strip()
-        # 清理文本确保PDF渲染正常
-        return clean_text_for_pdf(content) if content else content
-    except Exception as e:
-        print(f"Resume translation failed: {e}")
-        return None
+        try:
+            response = ai_client.chat.completions.create(
+                model=AI_MODEL_RESUME or AI_MODEL,
+                messages=[
+                    {"role": "system", "content": f"You are a professional resume translator specializing in {source_name} to {target_name} translation."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=3000,
+                timeout=60
+            )
+            
+            content = response.choices[0].message.content.strip()
+            # 清理文本确保PDF渲染正常
+            return clean_text_for_pdf(content) if content else content
+        except Exception as e:
+            print(f"Resume AI translation failed: {e}")
+            # AI失败时继续使用后备翻译
+    
+    # 后备翻译：使用术语对照表
+    translation_map = TERM_TRANSLATIONS.get((source_lang, target_lang), {})
+    if not translation_map:
+        return None  # 没有可用的翻译对照
+    
+    result = resume_text
+    for source_term, target_term in translation_map.items():
+        # 不区分大小写替换
+        import re
+        pattern = re.compile(re.escape(source_term), re.IGNORECASE)
+        result = pattern.sub(target_term, result)
+    
+    return result
 
 @app.post("/api/resume/translate")
 async def translate_resume_endpoint(request: TranslateResumeRequest):
@@ -4464,6 +4552,15 @@ async def get_tracking_stats():
         "message": "Anonymous statistics only",
         "note": "No personal data is stored"
     }
+
+# 简历模板文件路由
+@app.get("/templates/resume-{template_name}.html")
+async def serve_resume_template(template_name: str):
+    """服务简历模板HTML文件"""
+    file_path = os.path.join(FRONTEND_DIR, "templates", f"resume-{template_name}.html")
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="text/html")
+    return {"detail": "Template not found"}
 
 # 模板文件路由
 @app.get("/static/templates/{filename}")

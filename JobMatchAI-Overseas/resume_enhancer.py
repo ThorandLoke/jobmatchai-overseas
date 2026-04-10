@@ -547,37 +547,86 @@ class ResumeEnhancer:
     def _generate_suggestions(self, 
                              hidden_skills: List[HiddenSkill],
                              forgotten: List[ForgottenExperience],
-                             keywords: List[str]) -> List[str]:
-        """生成简历优化建议"""
+                             keywords: List[str],
+                             resume_text: str = "") -> List[str]:
+        """生成简历优化建议（最多30条详细建议）"""
         suggestions = []
         
+        # 1. 隐性技能建议（每条技能一条，最多15条）
         if hidden_skills:
             suggestions.append(
-                f"🔍 发现 {len(hidden_skills)} 个可能未体现在简历中的技能/项目经验"
+                f"🔍 【隐性能力挖掘】发现 {len(hidden_skills)} 个可能未体现在简历中的技能/项目经验："
             )
-            for skill in hidden_skills[:3]:
+            for skill in hidden_skills[:15]:
+                category_emoji = {
+                    "technical": "💻",
+                    "soft": "🤝", 
+                    "domain": "📊",
+                    "tool": "🛠️"
+                }.get(skill.category, "📌")
+                
+                # 生成具体建议
+                evidence_text = ""
+                if skill.evidence:
+                    evidence_text = f"（证据：{'; '.join(skill.evidence[:2])})"
+                
                 suggestions.append(
-                    f"   • {skill.skill_name} (来源: {skill.source}, 置信度: {skill.confidence:.0%})"
+                    f"   {category_emoji} {skill.skill_name} {evidence_text}"
+                )
+                suggestions.append(
+                    f"      → 建议：在简历中如何体现此能力"
                 )
         
+        # 2. 遗忘经历建议（每条经历一条，最多10条）
         if forgotten:
             suggestions.append(
-                f"⏰ 发现 {len(forgotten)} 个可能被遗忘的经历"
+                f"\n⏰ 【遗忘经历提醒】发现 {len(forgotten)} 个可能被遗忘的经历："
             )
-            for exp in forgotten[:3]:
+            for exp in forgotten[:10]:
+                type_emoji = {
+                    "project": "🚀",
+                    "training": "📚",
+                    "certification": "🏆",
+                    "course": "🎓",
+                    "award": "⭐"
+                }.get(exp.type, "📌")
+                
                 suggestions.append(
-                    f"   • {exp.title} - {exp.suggestion}"
+                    f"   {type_emoji} {exp.title} - {exp.description[:50]}..."
+                )
+                suggestions.append(
+                    f"      → {exp.suggestion}"
                 )
         
+        # 3. 关键词优化建议
         if keywords:
             suggestions.append(
-                f"📝 建议添加 {len(keywords)} 个关键词以提升简历匹配度"
+                f"\n📝 【关键词优化】建议添加以下 {min(len(keywords), 10)} 个关键词以提升简历匹配度："
             )
+            for kw in keywords[:10]:
+                suggestions.append(f"   • {kw}")
         
-        if not suggestions:
-            suggestions.append("✅ 简历已覆盖主要经历，未发现明显遗漏")
+        # 4. 通用简历优化建议（固定5条）
+        suggestions.append(
+            f"\n✨ 【通用优化建议】简历优化的最佳实践："
+        )
+        suggestions.append("   • 使用强动词开头（如：主导、实现、优化、提升）")
+        suggestions.append("   • 量化成果（如：提升效率30%、节省成本50万）")
+        suggestions.append("   • 突出与目标职位的匹配度")
+        suggestions.append("   • 确保技能关键词与职位描述一致")
+        suggestions.append("   • 保持简历简洁，控制在2页以内")
         
-        return suggestions
+        # 5. ATS优化建议
+        suggestions.append(
+            f"\n🤖 【ATS优化建议】让简历更容易被筛选系统识别："
+        )
+        suggestions.append("   • 使用标准职位名称（如：ERP Consultant 而非 ERP wizard）")
+        suggestions.append("   • 避免使用特殊字符或图表")
+        suggestions.append("   • 将联系方式放在最上方")
+        suggestions.append("   • 使用常见文件格式（PDF优先）")
+        
+        # 限制总建议数不超过30条（返回前30条）
+        return suggestions[:30]
     
     def _get_ai_insights(self, 
                         resume_text: str,

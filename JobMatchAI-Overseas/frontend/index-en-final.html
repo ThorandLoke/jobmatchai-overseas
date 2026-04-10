@@ -5023,17 +5023,6 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 100);
         }
 
-        // inCover LetterPageAdd质量CheckButton
-        const coverTabContent = document.querySelector('#coverTab .card');
-        if (coverTabContent) {
-            const qualityBtn = document.createElement('button');
-            qualityBtn.className = 'btn btn-secondary';
-            qualityBtn.style.cssText = 'margin-top: 10px; width: 100%;';
-            qualityBtn.textContent = '🎯 评估ApplySuccessrate';
-            qualityBtn.onclick = checkCoverLetterQuality;
-            coverTabContent.appendChild(qualityBtn);
-        }
-
         // ToastTip
         function showToast(message) {
             const toast = document.createElement('div');
