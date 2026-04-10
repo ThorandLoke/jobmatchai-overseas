@@ -782,20 +782,32 @@ def search_china(keyword: str, location: str = "", limit: int = 10) -> List[Dict
     
     return filtered[:limit]
 
-# === API端点 ===
+# === 启动时初始化IP地理数据库 ===
+import ip_geo
+_xdb_path = os.path.join(os.path.dirname(__file__), "data", "ip2region.xdb")
+if os.path.exists(_xdb_path):
+    ip_geo.init(_xdb_path)
+    print(f"✅ IP地理数据库已加载: {_xdb_path}")
+else:
+    print(f"⚠️ IP地理数据库不存在: {_xdb_path}，将使用默认语言")
+
 
 @app.get("/")
 def read_root(request: Request):
-    """根据浏览器语言自动返回前端页面"""
-    # 获取Accept-Language头
-    accept_language = request.headers.get("accept-language", "en")
+    """根据客户端IP地理位置返回前端页面（大陆IP→中文版，其他→英文版）"""
+    # 获取客户端IP（考虑代理）
+    client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    if not client_ip:
+        client_ip = request.client.host if request.client else "127.0.0.1"
     
-    # 判断语言：中文用户返回中文版，其他（包括丹麦语、英文）返回英文版
-    if "zh" in accept_language.lower():
-        # 中文用户 → 中文版
+    # 根据IP地理位置判断
+    is_china = ip_geo.is_china_ip(client_ip) if ip_geo._xdb_content else False
+    
+    if is_china:
+        # 中国大陆IP → 中文版
         frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-zh.html")
     else:
-        # 其他所有语言（丹麦语、英文等）→ 英文版
+        # 其他地区IP（丹麦、欧洲等）→ 英文版（目前内容也是中文）
         frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en-final.html")
     
     if os.path.exists(frontend_path):
