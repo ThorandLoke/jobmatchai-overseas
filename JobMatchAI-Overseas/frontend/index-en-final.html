@@ -428,7 +428,9 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             <div class="tab active" onclick="switchTab('resume')">📄 Polish Resume</div>
             <div class="tab" onclick="switchTab('search')">💼 TargetPosition</div>
             <div class="tab" onclick="switchTab('cover')">✉️ CustomJob SearchApply</div>
-            <div class="tab" onclick="switchTab('payment')">⭐ BecomePremium</div>
+            <div class="tab" onclick="switchTab('templates')">📋 Resume Templates</div>
+            <div class="tab" onclick="switchTab('learning')">📚 Learning Resources</div>
+            <div class="tab" onclick="switchTab('payment')">⭐ Premium</div>
         </div>
         
         <!-- TargetPositionPage -->
@@ -863,6 +865,255 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             </div>
 </div>
 
+        <!-- Resume Templates Page -->
+        <div id="templatesTab" class="tab-content hidden">
+            <div class="card">
+                <h2>📋 Professional Resume Templates</h2>
+                <p style="color: #ccc; margin-bottom: 20px;">
+                    Choose a template that matches your industry, download and customize your resume
+                </p>
+                
+                <!-- Template Selection -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                    <!-- Classic Template -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s;" onmouseover="this.style.transform='translateY(-5px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                        <div style="background: linear-gradient(135deg, #1a365d, #2c5282); height: 180px; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <div style="text-align: center;">
+                                <div style="width: 60px; height: 4px; background: #00d4ff; margin: 0 auto 8px; border-radius: 2px;"></div>
+                                <div style="width: 100px; height: 60px; background: rgba(255,255,255,0.15); margin: 0 auto; border-radius: 4px;"></div>
+                                <div style="width: 80px; height: 4px; background: rgba(255,255,255,0.3); margin: 8px auto 0; border-radius: 2px;"></div>
+                                <div style="width: 90px; height: 4px; background: rgba(255,255,255,0.2); margin: 4px auto; border-radius: 2px;"></div>
+                            </div>
+                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;">Classic</div>
+                        </div>
+                        <div style="padding: 20px;">
+                            <h3 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">Professional Classic</h3>
+                            <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.5;">
+                                Deep blue classic style, ideal for finance, consulting, and management roles
+                            </p>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px;">
+                                <span style="background: rgba(26,54,93,0.5); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #88c4e8;">Finance</span>
+                                <span style="background: rgba(26,54,93,0.5); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #88c4e8;">Consulting</span>
+                                <span style="background: rgba(26,54,93,0.5); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #88c4e8;">Management</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="previewTemplateFull('classic')" style="width: 100%;">
+                                🔍 Preview Full Size
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Modern Template -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s;" onmouseover="this.style.transform='translateY(-5px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                        <div style="background: linear-gradient(135deg, #667eea, #764ba2); height: 180px; display: flex; align-items: center; justify-content: center; position: relative;">
+                            <div style="text-align: center;">
+                                <div style="width: 20px; height: 80px; background: rgba(255,255,255,0.9); position: absolute; left: 20px; border-radius: 4px;"></div>
+                                <div style="width: 100px; height: 50px; background: rgba(255,255,255,0.15); margin-left: 40px; border-radius: 4px;"></div>
+                                <div style="width: 80px; height: 4px; background: rgba(255,255,255,0.3); margin: 8px 0 4px 40px; border-radius: 2px;"></div>
+                                <div style="width: 90px; height: 4px; background: rgba(255,255,255,0.2); margin-left: 40px; border-radius: 2px;"></div>
+                            </div>
+                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;">Modern</div>
+                        </div>
+                        <div style="padding: 20px;">
+                            <h3 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">Modern Minimal</h3>
+                            <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.5;">
+                                Left-side colorful bar, ideal for IT, tech, and internet companies
+                            </p>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px;">
+                                <span style="background: rgba(102,126,234,0.3); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #c4b5fd;">IT</span>
+                                <span style="background: rgba(102,126,234,0.3); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #c4b5fd;">Tech</span>
+                                <span style="background: rgba(102,126,234,0.3); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #c4b5fd;">Internet</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="previewTemplateFull('modern')" style="width: 100%;">
+                                🔍 Preview Full Size
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Creative Template -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); transition: transform 0.3s, box-shadow 0.3s;" onmouseover="this.style.transform='translateY(-5px)';this.style.boxShadow='0 10px 30px rgba(0,0,0,0.3)'" onmouseout="this.style.transform='none';this.style.boxShadow='none'">
+                        <div style="background: linear-gradient(135deg, #0f0f23, #2d1f4e); height: 180px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+                            <div style="position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(236,72,153,0.3); border-radius: 50%;"></div>
+                            <div style="position: absolute; bottom: -10px; left: -10px; width: 50px; height: 50px; background: rgba(168,85,247,0.3); border-radius: 50%;"></div>
+                            <div style="text-align: center; position: relative; z-index: 1;">
+                                <div style="width: 100px; height: 50px; background: rgba(255,255,255,0.1); margin: 0 auto; border-radius: 8px; border: 1px solid rgba(236,72,153,0.5);"></div>
+                                <div style="width: 80px; height: 4px; background: rgba(236,72,153,0.5); margin: 8px auto; border-radius: 2px;"></div>
+                                <div style="width: 90px; height: 4px; background: rgba(168,85,247,0.4); margin: 4px auto; border-radius: 2px;"></div>
+                            </div>
+                            <div style="position: absolute; bottom: 10px; right: 10px; background: rgba(236,72,153,0.8); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem;">Creative</div>
+                        </div>
+                        <div style="padding: 20px;">
+                            <h3 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">Creative Tech</h3>
+                            <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.5;">
+                                Cyberpunk style, ideal for creative, marketing, and startup roles
+                            </p>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px;">
+                                <span style="background: rgba(236,72,153,0.2); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #f9a8d4;">Creative</span>
+                                <span style="background: rgba(236,72,153,0.2); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #f9a8d4;">Marketing</span>
+                                <span style="background: rgba(236,72,153,0.2); padding: 3px 10px; border-radius: 15px; font-size: 0.75rem; color: #f9a8d4;">Startup</span>
+                            </div>
+                            <button class="btn btn-primary" onclick="previewTemplateFull('creative')" style="width: 100%;">
+                                🔍 Preview Full Size
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tips Section -->
+                <div style="margin-top: 30px; background: rgba(0,212,255,0.08); border-radius: 12px; padding: 20px; border: 1px solid rgba(0,212,255,0.2);">
+                    <h3 style="color: #00d4ff; margin-bottom: 15px; font-size: 1rem;">💡 ATS-Friendly Resume Tips</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                        <div style="display: flex; gap: 8px; color: #ccc; font-size: 0.85rem;">
+                            <span style="color: #00d4ff;">1.</span> Use standard section headers
+                        </div>
+                        <div style="display: flex; gap: 8px; color: #ccc; font-size: 0.85rem;">
+                            <span style="color: #00d4ff;">2.</span> Include job description keywords
+                        </div>
+                        <div style="display: flex; gap: 8px; color: #ccc; font-size: 0.85rem;">
+                            <span style="color: #00d4ff;">3.</span> Use standard fonts (Arial, Calibri)
+                        </div>
+                        <div style="display: flex; gap: 8px; color: #ccc; font-size: 0.85rem;">
+                            <span style="color: #00d4ff;">4.</span> Keep it to 1-2 pages, save as PDF
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- More Templates Link -->
+                <div style="margin-top: 20px; text-align: center;">
+                    <p style="color: #888; font-size: 0.85rem; margin-bottom: 10px;">Looking for more templates?</p>
+                    <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                        <a href="https://www.canva.com/resumes/templates/" target="_blank" style="background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 8px; color: #fff; text-decoration: none; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);">Canva</a>
+                        <a href="https://zety.com/" target="_blank" style="background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 8px; color: #fff; text-decoration: none; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);">Zety</a>
+                        <a href="https://resumegenius.com/resume-templates" target="_blank" style="background: rgba(255,255,255,0.08); padding: 10px 16px; border-radius: 8px; color: #fff; text-decoration: none; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);">ResumeGenius</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Learning Resources Page -->
+        <div id="learningTab" class="tab-content hidden">
+            <div class="card">
+                <h2>📚 Learning Resources</h2>
+                <p style="color: #ccc; margin-bottom: 20px;">
+                    Curated courses and videos to help you land your dream job
+                </p>
+                
+                <!-- Three Categories -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    <!-- Category 1: Job-Targeted Courses -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; border: 1px solid rgba(0,212,255,0.2);">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <span style="font-size: 2rem;">🎯</span>
+                            <h3 style="color: #00d4ff; font-size: 1.1rem;">Job-Targeted Courses</h3>
+                        </div>
+                        <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 16px; line-height: 1.5;">
+                            Courses tailored to your target position, helping you acquire the skills employers want
+                        </p>
+                        <div style="space-y: 10px;">
+                            <a href="https://www.linkedin.com/learning/" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(0,112,209,0.2); border-radius: 8px; text-decoration: none; color: #fff; margin-bottom: 8px; transition: background 0.3s;" onmouseover="this.style.background='rgba(0,112,209,0.35)'" onmouseout="this.style.background='rgba(0,112,209,0.2)'">
+                                <span style="font-size: 1.2rem;">💼</span>
+                                <div>
+                                    <div style="font-size: 0.9rem; font-weight: 500;">LinkedIn Learning</div>
+                                    <div style="font-size: 0.75rem; color: #aaa;">Professional courses & certifications</div>
+                                </div>
+                            </a>
+                            <a href="https://www.coursera.org/" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(0,82,159,0.2); border-radius: 8px; text-decoration: none; color: #fff; margin-bottom: 8px; transition: background 0.3s;" onmouseover="this.style.background='rgba(0,82,159,0.35)'" onmouseout="this.style.background='rgba(0,82,159,0.2)'">
+                                <span style="font-size: 1.2rem;">🎓</span>
+                                <div>
+                                    <div style="font-size: 0.9rem; font-weight: 500;">Coursera</div>
+                                    <div style="font-size: 0.75rem; color: #aaa;">University courses & degrees</div>
+                                </div>
+                            </a>
+                            <a href="https://www.udemy.com/" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(163,41,102,0.2); border-radius: 8px; text-decoration: none; color: #fff; margin-bottom: 8px; transition: background 0.3s;" onmouseover="this.style.background='rgba(163,41,102,0.35)'" onmouseout="this.style.background='rgba(163,41,102,0.2)'">
+                                <span style="font-size: 1.2rem;">📖</span>
+                                <div>
+                                    <div style="font-size: 0.9rem; font-weight: 500;">Udemy</div>
+                                    <div style="font-size: 0.75rem; color: #aaa;">Affordable courses on any topic</div>
+                                </div>
+                            </a>
+                            <a href="https://www.edx.org/" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(42,55,86,0.4); border-radius: 8px; text-decoration: none; color: #fff; transition: background 0.3s;" onmouseover="this.style.background='rgba(42,55,86,0.6)'" onmouseout="this.style.background='rgba(42,55,86,0.4)'">
+                                <span style="font-size: 1.2rem;">🏛️</span>
+                                <div>
+                                    <div style="font-size: 0.9rem; font-weight: 500;">edX</div>
+                                    <div style="font-size: 0.75rem; color: #aaa;">MIT & Harvard courses</div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Category 2: Resume Skills -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; border: 1px solid rgba(102,126,234,0.3);">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <span style="font-size: 2rem;">📝</span>
+                            <h3 style="color: #a78bfa; font-size: 1.1rem;">Resume Skills Boost</h3>
+                        </div>
+                        <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 16px; line-height: 1.5;">
+                            Based on your resume analysis, strengthen your weak areas
+                        </p>
+                        <div style="background: rgba(102,126,234,0.1); border-radius: 8px; padding: 16px; text-align: center;">
+                            <div style="color: #a78bfa; font-size: 3rem; margin-bottom: 10px;">🤖</div>
+                            <p style="color: #ccc; font-size: 0.85rem;">Upload your resume first to get personalized skill recommendations</p>
+                            <button class="btn btn-primary" onclick="switchTab('resume'); setTimeout(() => document.getElementById('uploadArea').scrollIntoView({behavior:'smooth',block:'center'}), 200);" style="margin-top: 12px; font-size: 0.85rem;">
+                                📄 Analyze My Resume
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Category 3: Job Search Tips -->
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 16px; padding: 24px; border: 1px solid rgba(236,72,153,0.3);">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <span style="font-size: 2rem;">💼</span>
+                            <h3 style="color: #f472b6; font-size: 1.1rem;">Job Search Tips</h3>
+                        </div>
+                        <p style="color: #aaa; font-size: 0.85rem; margin-bottom: 16px; line-height: 1.5;">
+                            Master resume writing and interview techniques
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <a href="https://www.youtube.com/results?search_query=how+to+write+a+resume" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,0,0,0.15); border-radius: 8px; text-decoration: none; color: #fff; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,0,0,0.25)'" onmouseout="this.style.background='rgba(255,0,0,0.15)'">
+                                <span>▶️</span>
+                                <span style="font-size: 0.9rem;">Resume Writing Tutorials</span>
+                            </a>
+                            <a href="https://www.youtube.com/results?search_query=job+interview+tips" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,0,0,0.15); border-radius: 8px; text-decoration: none; color: #fff; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,0,0,0.25)'" onmouseout="this.style.background='rgba(255,0,0,0.15)'">
+                                <span>▶️</span>
+                                <span style="font-size: 0.9rem;">Interview Skills Videos</span>
+                            </a>
+                            <a href="https://www.youtube.com/results?search_query=cover+letter+tips" target="_blank" style="display: flex; align-items: center; gap: 10px; padding: 10px; background: rgba(255,0,0,0.15); border-radius: 8px; text-decoration: none; color: #fff; transition: background 0.3s;" onmouseover="this.style.background='rgba(255,0,0,0.25)'" onmouseout="this.style.background='rgba(255,0,0,0.15)'">
+                                <span>▶️</span>
+                                <span style="font-size: 0.9rem;">Cover Letter Tips</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chinese Resources Section -->
+                <div style="margin-top: 30px;">
+                    <h3 style="color: #fff; margin-bottom: 16px; font-size: 1rem;">🇨🇳 中文学习资源</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <a href="https://www.bilibili.com/" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 16px; background: rgba(255,105,180,0.15); border-radius: 12px; text-decoration: none; color: #fff; border: 1px solid rgba(255,105,180,0.3); transition: all 0.3s;" onmouseover="this.style.background='rgba(255,105,180,0.25)'" onmouseout="this.style.background='rgba(255,105,180,0.15)'">
+                            <span style="font-size: 1.8rem;">📺</span>
+                            <div>
+                                <div style="font-size: 0.95rem; font-weight: 500;">B站</div>
+                                <div style="font-size: 0.75rem; color: #aaa;">Bilibili - 求职面试技巧</div>
+                            </div>
+                        </a>
+                        <a href="https://www.zhihu.com/" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 16px; background: rgba(0,127,255,0.15); border-radius: 12px; text-decoration: none; color: #fff; border: 1px solid rgba(0,127,255,0.3); transition: all 0.3s;" onmouseover="this.style.background='rgba(0,127,255,0.25)'" onmouseout="this.style.background='rgba(0,127,255,0.15)'">
+                            <span style="font-size: 1.8rem;">💬</span>
+                            <div>
+                                <div style="font-size: 0.95rem; font-weight: 500;">知乎</div>
+                                <div style="font-size: 0.75rem; color: #aaa;">职场经验分享</div>
+                            </div>
+                        </a>
+                        <a href="https://www.douyin.com/" target="_blank" style="display: flex; align-items: center; gap: 12px; padding: 16px; background: rgba(0,0,0,0.3); border-radius: 12px; text-decoration: none; color: #fff; border: 1px solid rgba(255,255,255,0.1); transition: all 0.3s;" onmouseover="this.style.background='rgba(0,0,0,0.5)'" onmouseout="this.style.background='rgba(0,0,0,0.3)'">
+                            <span style="font-size: 1.8rem;">🎵</span>
+                            <div>
+                                <div style="font-size: 0.95rem; font-weight: 500;">抖音</div>
+                                <div style="font-size: 0.75rem; color: #aaa;">求职短视频教程</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- BecomePremiumPage -->
         <div id="paymentTab" class="tab-content hidden">
             <div class="card">
@@ -1294,14 +1545,17 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             container.style.display = 'block';
             
-            list.innerHTML = jobs.map(job => `
-                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 3px solid #00d4ff;">
+            list.innerHTML = jobs.map((job, idx) => `
+                <div style="background: rgba(0,0,0,0.2); border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 3px solid #00d4ff;" data-job-idx="${idx}">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                         <div>
                             <h3 style="color: #00d4ff; margin-bottom: 4px;">${job.title}</h3>
                             <p style="color: #ccc; font-size: 0.9rem;">🏢 ${job.company} | 📍 ${job.location || 'not指定'}</p>
                         </div>
-                        <span style="background: rgba(0,212,255,0.2); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${job.source}</span>
+                        <div style="text-align: right;">
+                            <span style="background: rgba(0,212,255,0.2); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem;">${job.source}</span>
+                            ${job.salary_range ? `<div style="margin-top: 6px; font-size: 0.85rem; color: #4ade80;">💰 ${job.salary_range}</div>` : `<div class="salary-display" style="margin-top: 6px; font-size: 0.85rem; color: #888;">💰 Salary not disclosed</div>`}
+                        </div>
                     </div>
                     ${job.description ? `<p style="color: #ccc; font-size: 0.85rem; margin-top: 8px; line-height: 1.4;">${job.description.substring(0, 200)}${job.description.length > 200 ? '...' : ''}</p>` : ''}
                     <div style="margin-top: 12px;">
@@ -1310,6 +1564,12 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     </div>
                 </div>
             `).join('');
+            
+            // Update results header with count
+            const header = container.querySelector('h2');
+            if (header) {
+                header.innerHTML = `🔍 Search Results <span style="font-size: 0.9rem; color: #ccc;">(${jobs.length} positions found)</span>`;
+            }
         }
         
         // HTML转义
@@ -1468,6 +1728,23 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 </div>
             `;
             
+            // Resume Template Recommendations
+            html += `
+                <div class="form-group" style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(102,126,234,0.15), rgba(118,75,162,0.15)); border-radius: 12px; border: 1px solid rgba(102,126,234,0.4);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                        <span style="font-size: 1.2rem;">📄</span>
+                        <span style="color: #a78bfa; font-weight: 600;">Professional Resume Templates</span>
+                    </div>
+                    <p style="color: #ccc; font-size: 0.85rem; margin-bottom: 12px;">Download a professionally designed template to present your skills effectively.</p>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                        <button onclick="switchTab('templates')" style="background: linear-gradient(90deg, #00d4ff, #0099cc); border: none; color: #fff; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500;">
+                            🔍 Browse All Templates
+                        </button>
+                        <span style="color: #888; font-size: 0.8rem;">Classic · Modern · Creative</span>
+                    </div>
+                </div>
+            `;
+            
             contentDiv.innerHTML = html;
             resultDiv.classList.remove('hidden');
             
@@ -1539,6 +1816,68 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         let userDecisions = [];  // User决定 [{id, accepted}, ...]
         let polishedResumeText = '';  // PolishedResume
         let polishProgressInterval = null;  // 进度条定time器
+
+        // Resume Templates
+        function showTemplates(templateId) {
+            // Open template page with selected template
+            window.open(`/templates.html?template=${templateId}`, '_blank');
+        }
+        
+        // Preview Template Full Size (Modal)
+        function previewTemplateFull(templateId) {
+            const templates = {
+                classic: {
+                    name: 'Professional Classic',
+                    desc: 'Deep blue classic style, ideal for finance, consulting, and management roles',
+                    color: '#1a365d'
+                },
+                modern: {
+                    name: 'Modern Minimal',
+                    desc: 'Left-side colorful bar, ideal for IT, tech, and internet companies',
+                    color: '#667eea'
+                },
+                creative: {
+                    name: 'Creative Tech',
+                    desc: 'Cyberpunk style, ideal for creative, marketing, and startup roles',
+                    color: '#0f0f23'
+                }
+            };
+            const tpl = templates[templateId];
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:20px;';
+            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+            
+            modal.innerHTML = `
+                <div style="background:${tpl.color};width:100%;max-width:700px;aspect-ratio:1/1.4;border-radius:8px;display:flex;flex-direction:column;padding:40px;box-shadow:0 20px 60px rgba(0,0,0,0.5);position:relative;">
+                    <div style="position:absolute;top:20px;right:20px;width:30px;height:30px;background:rgba(255,255,255,0.2);border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.2rem;" onclick="this.closest('div').parentElement.parentElement.remove()">×</div>
+                    <div style="width:100%;height:8px;background:#00d4ff;border-radius:4px;margin-bottom:20px;"></div>
+                    <div style="display:flex;gap:20px;flex:1;">
+                        ${templateId === 'modern' ? '<div style="width:20px;background:rgba(255,255,255,0.9);border-radius:4px;"></div>' : ''}
+                        <div style="flex:1;display:flex;flex-direction:column;gap:12px;">
+                            <div style="width:60%;height:25px;background:rgba(255,255,255,0.9);border-radius:4px;"></div>
+                            <div style="width:40%;height:12px;background:rgba(255,255,255,0.4);border-radius:4px;"></div>
+                            <div style="width:30%;height:10px;background:rgba(255,255,255,0.3);border-radius:4px;"></div>
+                            <div style="margin-top:10px;width:100%;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;"></div>
+                            <div style="width:95%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;"></div>
+                            <div style="width:80%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;"></div>
+                            <div style="margin-top:15px;width:100%;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;"></div>
+                            <div style="width:90%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;"></div>
+                            <div style="width:85%;height:4px;background:rgba(255,255,255,0.15);border-radius:2px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:center;margin-top:20px;color:#fff;">
+                    <h3 style="margin-bottom:5px;">${tpl.name}</h3>
+                    <p style="color:#aaa;font-size:0.9rem;margin-bottom:15px;">${tpl.desc}</p>
+                    <div style="display:flex;gap:10px;justify-content:center;">
+                        <a href="/templates/resume-${templateId}.html" target="_blank" class="btn btn-primary">Download Template</a>
+                        <button onclick="this.closest('div').parentElement.parentElement.remove()" class="btn btn-secondary">Close</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
 
         // StartPolish流程
         async function startPolish() {
