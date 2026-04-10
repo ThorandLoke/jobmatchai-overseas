@@ -785,9 +785,19 @@ def search_china(keyword: str, location: str = "", limit: int = 10) -> List[Dict
 # === API端点 ===
 
 @app.get("/")
-def read_root():
-    """返回前端页面"""
-    frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index.html")
+def read_root(request: Request):
+    """根据浏览器语言自动返回前端页面"""
+    # 获取Accept-Language头
+    accept_language = request.headers.get("accept-language", "en")
+    
+    # 判断语言：中文用户返回中文版，其他（包括丹麦语、英文）返回英文版
+    if "zh" in accept_language.lower():
+        # 中文用户 → 中文版
+        frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-zh.html")
+    else:
+        # 其他所有语言（丹麦语、英文等）→ 英文版
+        frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en-final.html")
+    
     if os.path.exists(frontend_path):
         return FileResponse(frontend_path)
     return {"message": "JobMatchAI Nordic API", "version": "2.0.0"}
