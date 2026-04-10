@@ -18,6 +18,9 @@ import json
 import jwt
 import unicodedata
 
+# 学习推荐引擎
+from learning_recommendations import router as learning_router
+
 # AI 配置 - 质量优先：简历用GPT-4o，求职信用GPT-4o-mini
 # 首先尝试从 .env 文件加载环境变量
 def load_env_file():
@@ -77,14 +80,23 @@ except Exception as e:
 
 app = FastAPI(title="JobMatchAI Nordic API", version="2.0.0")
 
-# CORS配置
+# CORS配置 - 明确允许的域名（allow_credentials=True时不能用*）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://job-match-ai.com",
+        "https://www.job-match-ai.com",
+        "https://jobmatchai-37ld.onrender.com",
+        "http://localhost:8000",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 学习推荐引擎路由
+app.include_router(learning_router)
 
 # === 数据模型 ===
 class Job(BaseModel):
@@ -550,6 +562,21 @@ def search_adzuna(keyword: str, country: str = "gb", location: str = "", limit: 
                 else:
                     location_name = str(location_val) if location_val else ""
                 
+                # 提取薪资范围
+                salary_min = j.get("salary_min")
+                salary_max = j.get("salary_max")
+                salary_range = ""
+                if salary_min or salary_max:
+                    currency = "DKK" if country == "dk" else "GBP" if country == "gb" else "EUR"
+                    if salary_min and salary_max:
+                        # 转换为年薪
+                        if salary_min < 10000:
+                            salary_min *= 12
+                            salary_max *= 12
+                        salary_range = f"{currency} {salary_min/1000:.0f}K-{salary_max/1000:.0f}K"
+                    elif salary_min:
+                        salary_range = f"From {currency} {salary_min/1000:.0f}K"
+                
                 jobs.append({
                     "title": j.get("title", ""),
                     "company": company_name,
@@ -558,6 +585,7 @@ def search_adzuna(keyword: str, country: str = "gb", location: str = "", limit: 
                     "url": j.get("redirect_url", ""),
                     "date": j.get("created", "")[:10] if j.get("created") else "",
                     "source": f"🇦🇹 Adzuna-{country_name}",
+                    "salary_range": salary_range,
                     "language": "en"
                 })
         return jobs
@@ -779,6 +807,14 @@ def read_english_page():
     if os.path.exists(en_path):
         return FileResponse(en_path)
     return {"error": "English page not found"}
+
+@app.get("/v3")
+def read_v3_page():
+    """返回V3测试版页面"""
+    v3_path = os.path.join(os.path.dirname(__file__), "frontend", "index-v3.html")
+    if os.path.exists(v3_path):
+        return FileResponse(v3_path)
+    return {"error": "V3 page not found"}
 
 @app.get("/health")
 def health_check():
@@ -4332,6 +4368,81 @@ async def health_check():
     """健康检查"""
     return {"status": "healthy", "version": "2.0.0", "ai_available": AI_AVAILABLE}
 
+# ===== 意见反馈 API =====
+class FeedbackRequest(BaseModel):
+    userId: Optional[str] = None
+    email: Optional[str] = None
+    type: str  # suggestion, bug, other
+    content: str
+
+@app.post("/api/feedback")
+async def submit_feedback(feedback: FeedbackRequest, request: Request):
+    """提交用户反馈"""
+    try:
+        feedback_data = {
+            "user_id": feedback.userId or "anonymous",
+            "email": feedback.email or "",
+            "type": feedback.type,
+            "content": feedback.content,
+            "timestamp": datetime.now().isoformat(),
+            "user_agent": request.headers.get("user-agent", ""),
+        }
+        
+        # 发送到管理员邮箱（如果配置了）
+        if os.getenv("NOTIFY_EMAIL"):
+            try:
+                # 简化版：直接打印到日志，正式环境可用邮件服务
+                print(f"[FEEDBACK] From: {feedback.email or 'Anonymous'} | Type: {feedback.type}")
+                print(f"[FEEDBACK] Content: {feedback.content}")
+            except Exception as e:
+                print(f"[FEEDBACK] Email notification failed: {e}")
+        
+        # 返回成功
+        return {"status": "ok", "message": "反馈已收到，感谢您的建议！"}
+    except Exception as e:
+        print(f"[FEEDBACK ERROR] {e}")
+        return {"status": "error", "message": str(e)}
+
+# ===== 客户数据追踪 API（匿名，仅用于AI训练）=====
+class AnonymousTrackingRequest(BaseModel):
+    session_id: str
+    industry: Optional[str] = None  # 行业分类（不是个人信息）
+    job_title: Optional[str] = None  # 职位类型（不是具体公司）
+    resume_skills: Optional[List[str]] = None  # 提取的技能标签
+    action_type: str  # analyze_resume, generate_cover, etc.
+
+@app.post("/api/track")
+async def track_anonymous_data(data: AnonymousTrackingRequest):
+    """匿名追踪客户行为数据，用于AI训练"""
+    try:
+        tracking_data = {
+            "session_id": data.session_id[:16] + "***",  # 只保留session前16位
+            "industry": data.industry or "unknown",
+            "job_title": data.job_title or "unknown",
+            "resume_skills": data.resume_skills or [],
+            "action_type": data.action_type,
+            "timestamp": datetime.now().isoformat(),
+        }
+        
+        # 只记录行业和技能类型，不记录任何个人信息
+        # 这些数据用于训练AI更好地理解不同行业求职者的需求
+        print(f"[TRACKING] Industry: {data.industry} | Action: {data.action_type} | Skills: {len(data.resume_skills or [])}")
+        
+        return {"status": "ok", "message": "Tracking recorded (anonymous)"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/track/stats")
+async def get_tracking_stats():
+    """获取追踪统计（仅显示聚合数据，不含个人信息）"""
+    # 这里可以返回一些聚合统计，如各行业的使用量
+    # 实际实现需要查询数据库
+    return {
+        "status": "ok",
+        "message": "Anonymous statistics only",
+        "note": "No personal data is stored"
+    }
+
 # 模板文件路由
 @app.get("/static/templates/{filename}")
 async def serve_template(filename: str):
@@ -4349,6 +4460,194 @@ async def serve_static(filepath: str):
     if os.path.exists(file_path):
         return FileResponse(file_path)
     return {"detail": "File not found"}
+
+
+# === 简历模版 API ===
+
+from resume_templates import (
+    get_template_list,
+    get_template_by_id,
+    get_template_html,
+    get_external_links,
+    suggest_ats_keywords
+)
+
+from industry_tracker import (
+    detect_industry,
+    get_industry_by_id,
+    get_all_industries,
+    CoverLetterEvolution,
+    get_salary_estimate,
+    format_salary_range,
+    get_salary_tips,
+    get_industry_strategy
+)
+
+# 初始化求职信进化追踪器（按用户ID存储）
+letter_evolution_store: Dict[str, CoverLetterEvolution] = {}
+
+
+@app.get("/templates/list")
+def list_templates(language: str = "en"):
+    """获取简历模版列表"""
+    return {
+        "success": True,
+        "templates": get_template_list(language),
+        "external_links": get_external_links(language)
+    }
+
+
+@app.get("/templates/{template_id}")
+def get_template(template_id: str, language: str = "en"):
+    """获取指定模版"""
+    template = get_template_by_id(template_id, language)
+    if not template:
+        return {"success": False, "error": "Template not found"}
+    return {"success": True, "template": template}
+
+
+@app.post("/templates/render")
+async def render_template(
+    template_id: str = Form(...),
+    resume_data: str = Form(...)  # JSON
+):
+    """根据简历数据渲染模版"""
+    try:
+        import json
+        data = json.loads(resume_data)
+        html = get_template_html(template_id, data)
+        if not html:
+            return {"success": False, "error": "Failed to render template"}
+        return {"success": True, "html": html}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/ats/keywords")
+def get_ats_keywords_suggestions(
+    job_title: str = "",
+    industry: str = ""
+):
+    """获取ATS关键词建议"""
+    keywords = suggest_ats_keywords(job_title, industry)
+    return {
+        "success": True,
+        "keywords": keywords,
+        "note": "在简历中使用这些关键词可以提高ATS通过率"
+    }
+
+
+# === 行业追踪 API ===
+
+@app.get("/industries/list")
+def list_industries(language: str = "en"):
+    """获取行业列表"""
+    return {
+        "success": True,
+        "industries": get_all_industries(language)
+    }
+
+
+@app.post("/industries/detect")
+async def detect_job_industry(
+    job_title: str = Form(...),
+    description: str = Form("")
+):
+    """根据职位信息识别行业"""
+    result = detect_industry(job_title, description)
+    return {
+        "success": True,
+        "detection": result
+    }
+
+
+@app.get("/industries/{industry_id}/strategy")
+def get_industry_application_strategy(industry_id: str):
+    """获取特定行业的申请策略"""
+    strategy = get_industry_strategy(industry_id)
+    return {
+        "success": True,
+        "strategy": strategy
+    }
+
+
+# === 求职信进化追踪 API ===
+
+@app.get("/letter-evolution/{user_id}")
+def get_letter_evolution(user_id: str):
+    """获取用户的求职信进化历史"""
+    if user_id not in letter_evolution_store:
+        letter_evolution_store[user_id] = CoverLetterEvolution()
+    
+    tracker = letter_evolution_store[user_id]
+    summary = tracker.get_evolution_summary()
+    
+    return {
+        "success": True,
+        "evolution": summary
+    }
+
+
+@app.post("/letter-evolution/add")
+async def add_cover_letter_record(
+    user_id: str = Form(...),
+    company: str = Form(...),
+    job_title: str = Form(...),
+    content: str = Form(...),
+    industry: str = Form("")
+):
+    """记录一封求职信"""
+    if user_id not in letter_evolution_store:
+        letter_evolution_store[user_id] = CoverLetterEvolution()
+    
+    tracker = letter_evolution_store[user_id]
+    letter_info = tracker.add_letter(company, job_title, content, industry)
+    
+    return {
+        "success": True,
+        "letter": letter_info
+    }
+
+
+@app.post("/letter-evolution/suggestions")
+async def get_letter_improvement_suggestions(
+    user_id: str = Form(...),
+    new_job_title: str = Form(...),
+    new_industry: str = Form("")
+):
+    """获取改进建议"""
+    if user_id not in letter_evolution_store:
+        letter_evolution_store[user_id] = CoverLetterEvolution()
+    
+    tracker = letter_evolution_store[user_id]
+    suggestions = tracker.suggest_improvements(new_job_title, new_industry)
+    
+    return {
+        "success": True,
+        "suggestions": suggestions
+    }
+
+
+# === 薪资范围查询 API ===
+
+@app.get("/salary/estimate")
+def get_salary(
+    job_title: str = "",
+    location: str = "",
+    country: str = "DK"
+):
+    """获取薪资估算"""
+    salary_data = get_salary_estimate(job_title, location, country)
+    formatted = format_salary_range(salary_data)
+    tips = get_salary_tips(country)
+    
+    return {
+        "success": True,
+        "salary": salary_data,
+        "formatted": formatted,
+        "tips": tips,
+        "disclaimer": salary_data.get("disclaimer_en", "")
+    }
 
 
 # === 启动 ===
