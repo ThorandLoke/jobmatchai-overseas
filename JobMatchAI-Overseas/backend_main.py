@@ -2068,13 +2068,13 @@ if STRIPE_SECRET_KEY:
     except Exception as e:
         print(f"⚠️ Stripe 初始化失败: {e}")
 
-# 订阅套餐配置 - Pro 产品
+# 订阅套餐配置 - Pro 产品（2026-04-11 更新价格）
 SUBSCRIPTION_PLANS = {
     "monthly": {
         "name": "Pro 月卡",
         "price_id": "price_1TKvh5ETBa7HTDFvGm4okWr8",  # 月付
-        "price": 79,  # DKK / 月
-        "price_cny": 79,  # RMB / 月
+        "price": 59,  # DKK / 月
+        "price_cny": 59,  # RMB / 月
         "currency": "dkk",
         "currency_cny": "cny",
         "interval": "month",
@@ -2091,8 +2091,8 @@ SUBSCRIPTION_PLANS = {
     "quarterly": {
         "name": "Pro 季卡",
         "price_id": "price_1TKvh5ETBa7HTDFvTNrSqL79",  # 季付
-        "price": 229,  # DKK / 季
-        "price_cny": 229,  # RMB / 季
+        "price": 159,  # DKK / 季
+        "price_cny": 159,  # RMB / 季
         "currency": "dkk",
         "currency_cny": "cny",
         "interval": "quarter",
@@ -2105,13 +2105,13 @@ SUBSCRIPTION_PLANS = {
             "✅ 申请追踪",
             "✅ 优先客户支持"
         ],
-        "tagline": "💡 比月付省 ¥8"
+        "tagline": "💡 比月付省 ¥18"
     },
     "yearly": {
         "name": "Pro 年卡",
         "price_id": "price_1TKkGmETBa7HTDFva5uzb9wo",  # 年付
-        "price": 799,  # DKK / 年
-        "price_cny": 799,  # RMB / 年
+        "price": 499,  # DKK / 年
+        "price_cny": 499,  # RMB / 年
         "currency": "dkk",
         "currency_cny": "cny",
         "interval": "year",
@@ -2125,7 +2125,7 @@ SUBSCRIPTION_PLANS = {
             "✅ 优先客户支持",
             "✅ 简历与职位匹配度评估"
         ],
-        "tagline": "💡 Best Value ⭐ 省 ¥149"
+        "tagline": "💡 Best Value ⭐ 节省 ¥209"
     }
 }
 
@@ -2174,7 +2174,7 @@ class StripeManager:
     def _calculate_savings(self, plan_id: str, is_china: bool = False) -> str:
         """计算节省金额"""
         currency = "¥" if is_china else "DKK "
-        monthly_total = 79 * 12  # 基于月付价格
+        monthly_total = 59 * 12  # 基于月付价格 59 DKK
         plan = self.plans.get(plan_id, {})
 
         if is_china:
