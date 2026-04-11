@@ -89,6 +89,7 @@ app.add_middleware(
         "https://jobmatchai-37ld.onrender.com",
         "http://localhost:8000",
         "http://localhost:3000",
+        "http://localhost:8080",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -684,7 +685,7 @@ def search_sweden(keyword: str, location: str = "", limit: int = 10) -> List[Dic
 
 # 丹麦 Jobinsats API
 JOBINSATS_API_KEY = os.environ.get("JOBINSATS_API_KEY", "00e043b3fc3a0d9ab5eb956ed644f113c3856175fc96fd54")
-JOBINSATS_BASE = "https://jobindsats.dk/api/v1"
+JOBINSATS_BASE = "https://api.jobindsats.dk"
 
 def search_denmark(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
     """搜索丹麦职位 - Jobinsats API"""
@@ -2067,54 +2068,64 @@ if STRIPE_SECRET_KEY:
     except Exception as e:
         print(f"⚠️ Stripe 初始化失败: {e}")
 
-# 订阅套餐配置
+# 订阅套餐配置 - Pro 产品
 SUBSCRIPTION_PLANS = {
     "monthly": {
-        "name": "月卡",
-        "price_id": os.getenv("STRIPE_PRICE_MONTHLY", "price_monthly_placeholder"),
-        "price": 29,  # ¥ / 月
-        "currency": "cny",
+        "name": "Pro 月卡",
+        "price_id": "price_1TKvh5ETBa7HTDFvGm4okWr8",  # 月付
+        "price": 79,  # DKK / 月
+        "price_cny": 79,  # RMB / 月
+        "currency": "dkk",
+        "currency_cny": "cny",
         "interval": "month",
         "features": [
-            "✅ 10次职位搜索",
-            "✅ 3次简历分析",
-            "✅ 10份求职信生成",
-            "✅ 10次AI智能匹配",
-            "✅ 3次行为数据挖掘",
+            "✅ AI智能简历分析",
+            "✅ 无限职位搜索",
+            "✅ 无限求职信生成",
+            "✅ ATS关键词优化",
+            "✅ 简历模版",
+            "✅ 申请追踪"
         ],
-        "tagline": "💡 每天不到1块钱"
+        "tagline": "💡 灵活订阅，随时取消"
     },
     "quarterly": {
-        "name": "季卡",
-        "price_id": os.getenv("STRIPE_PRICE_QUARTERLY", "price_quarterly_placeholder"),
-        "price": 79,  # ¥ / 季
-        "currency": "cny",
+        "name": "Pro 季卡",
+        "price_id": "price_1TKvh5ETBa7HTDFvTNrSqL79",  # 季付
+        "price": 229,  # DKK / 季
+        "price_cny": 229,  # RMB / 季
+        "currency": "dkk",
+        "currency_cny": "cny",
         "interval": "quarter",
         "features": [
-            "✅ 30次职位搜索",
-            "✅ 10次简历分析",
-            "✅ 30份求职信生成",
-            "✅ 30次AI智能匹配",
-            "✅ 10次行为数据挖掘",
+            "✅ AI智能简历分析",
+            "✅ 无限职位搜索",
+            "✅ 无限求职信生成",
+            "✅ ATS关键词优化",
+            "✅ 简历模版",
+            "✅ 申请追踪",
+            "✅ 优先客户支持"
         ],
-        "tagline": "💡 比月卡省¥8"
+        "tagline": "💡 比月付省 ¥8"
     },
     "yearly": {
-        "name": "年卡",
-        "price_id": os.getenv("STRIPE_PRICE_YEARLY", "price_yearly_placeholder"),
-        "price": 199,  # ¥ / 年
-        "currency": "cny",
+        "name": "Pro 年卡",
+        "price_id": "price_1TKkGmETBa7HTDFva5uzb9wo",  # 年付
+        "price": 799,  # DKK / 年
+        "price_cny": 799,  # RMB / 年
+        "currency": "dkk",
+        "currency_cny": "cny",
         "interval": "year",
         "features": [
+            "✅ AI智能简历分析",
             "✅ 无限职位搜索",
-            "✅ 无限简历分析",
             "✅ 无限求职信生成",
-            "✅ 无限AI智能匹配",
-            "✅ 30次行为数据挖掘",
+            "✅ ATS关键词优化",
+            "✅ 简历模版",
             "✅ 申请追踪",
-            "✅ 企业端龙虾接口"
+            "✅ 优先客户支持",
+            "✅ 简历与职位匹配度评估"
         ],
-        "tagline": "💡 最超值，省¥149"
+        "tagline": "💡 Best Value ⭐ 省 ¥149"
     }
 }
 
@@ -2128,38 +2139,62 @@ class StripeManager:
     def __init__(self):
         self.plans = SUBSCRIPTION_PLANS
 
-    def get_plans(self) -> List[Dict]:
-        """获取所有订阅套餐"""
+    def is_china_ip(self, client_ip: str) -> bool:
+        """简单判断是否为中国大陆IP（生产环境建议用专业的IP库）"""
+        if not client_ip:
+            return False
+        # 常见中国IP段（简化版，生产环境建议用 ip2location 或 ipapi）
+        china_ip_prefixes = ['36.', '42.', '58.', '59.', '60.', '61.', '101.', '103.', '106.', '110.', '111.', '112.', '113.', '114.', '115.', '116.', '117.', '118.', '119.', '120.', '121.', '122.', '123.', '124.', '125.', '140.', '175.', '180.', '182.', '183.', '202.', '203.', '210.', '211.', '218.', '220.', '221.', '222.', '223.']
+        return any(client_ip.startswith(prefix) for prefix in china_ip_prefixes)
+
+    def get_plans(self, client_ip: str = None) -> List[Dict]:
+        """获取所有订阅套餐（根据IP分流显示不同货币）"""
+        is_china = self.is_china_ip(client_ip) if client_ip else False
         result = []
         for plan_id, plan in self.plans.items():
+            # 根据IP选择货币和价格
+            if is_china:
+                price = plan.get("price_cny", plan["price"])
+                currency = plan.get("currency_cny", "cny")
+            else:
+                price = plan["price"]
+                currency = plan["currency"]
+
             result.append({
                 "id": plan_id,
                 "name": plan["name"],
-                "price": plan["price"],
-                "currency": plan["currency"],
+                "price": price,
+                "currency": currency,
                 "interval": plan["interval"],
                 "features": plan["features"],
-                "savings": self._calculate_savings(plan_id)
+                "savings": self._calculate_savings(plan_id, is_china)
             })
         return result
 
-    def _calculate_savings(self, plan_id: str) -> str:
+    def _calculate_savings(self, plan_id: str, is_china: bool = False) -> str:
         """计算节省金额"""
-        monthly_total = 79 * 12
+        currency = "¥" if is_china else "DKK "
+        monthly_total = 79 * 12  # 基于月付价格
         plan = self.plans.get(plan_id, {})
-        yearly_price = plan.get("price", 0)
+
+        if is_china:
+            yearly_price = plan.get("price_cny", plan["price"])
+        else:
+            yearly_price = plan["price"]
+
         if plan_id == "yearly" and yearly_price > 0:
             saved = monthly_total - yearly_price
-            return f"省 {saved} DKK/年"
+            return f"省 {currency}{saved}/年"
         elif plan_id == "quarterly" and yearly_price > 0:
             saved = monthly_total - yearly_price * 4
-            return f"省 {saved} DKK/年"
+            return f"省 {currency}{saved}/年"
         return ""
 
     def create_checkout_session(self, plan_id: str, user_id: str,
                                  success_url: str = "/?payment=success",
-                                 cancel_url: str = "/?payment=cancelled") -> Dict:
-        """创建 Stripe Checkout Session"""
+                                 cancel_url: str = "/?payment=cancelled",
+                                 client_ip: str = None) -> Dict:
+        """创建 Stripe Checkout Session（支持IP分流）"""
         if not stripe_client:
             # Demo 模式：模拟支付流程
             return self._create_demo_checkout(plan_id, user_id)
@@ -2168,17 +2203,26 @@ class StripeManager:
         if not plan:
             return {"success": False, "error": "Invalid plan"}
 
+        # 根据IP选择货币和价格
+        is_china = self.is_china_ip(client_ip) if client_ip else False
+        if is_china:
+            currency = plan.get("currency_cny", "cny")
+            price = plan.get("price_cny", plan["price"])
+        else:
+            currency = plan["currency"]
+            price = plan["price"]
+
         try:
             session = stripe_client.checkout.Session.create(
                 payment_method_types=['card'],
                 line_items=[{
                     'price_data': {
-                        'currency': plan["currency"],
+                        'currency': currency,
                         'product_data': {
                             'name': f"JobMatchAI {plan['name']}",
-                            'description': f"Access to all JobMatchAI features for {plan['interval']}"
+                            'description': f"Access to all JobMatchAI features - {plan['interval']}"
                         },
-                        'unit_amount': plan["price"] * 100,  # Stripe 使用分
+                        'unit_amount': price * 100,  # Stripe 使用分
                     },
                     'quantity': 1,
                 }],
@@ -2187,14 +2231,17 @@ class StripeManager:
                 cancel_url=cancel_url,
                 metadata={
                     "user_id": user_id,
-                    "plan_id": plan_id
+                    "plan_id": plan_id,
+                    "is_china": str(is_china)
                 },
                 customer_email=None
             )
             return {
                 "success": True,
                 "session_id": session.id,
-                "checkout_url": session.url
+                "checkout_url": session.url,
+                "currency": currency,
+                "price": price
             }
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -2303,13 +2350,32 @@ class StripeManager:
 stripe_manager = StripeManager()
 
 
+def get_client_ip(request: Request) -> str:
+    """获取客户端真实IP"""
+    # 优先从 X-Forwarded-For 获取（如果通过代理）
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    # 然后尝试 X-Real-IP
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip
+    # 最后用客户端 IP
+    if request.client:
+        return request.client.host
+    return ""
+
+
 @app.get("/payment/plans")
-def get_payment_plans():
-    """获取所有订阅套餐"""
+def get_payment_plans(request: Request):
+    """获取所有订阅套餐（根据IP显示不同货币）"""
+    client_ip = get_client_ip(request)
+    is_china = stripe_manager.is_china_ip(client_ip)
     return {
         "success": True,
-        "plans": stripe_manager.get_plans(),
-        "currency": "dkk",
+        "plans": stripe_manager.get_plans(client_ip),
+        "currency": "cny" if is_china else "dkk",
+        "region": "china" if is_china else "international",
         "demo_note": "配置 STRIPE_SECRET_KEY 环境变量启用真实支付" if not STRIPE_SECRET_KEY else ""
     }
 
@@ -2324,13 +2390,14 @@ def get_subscription(user_id: str):
 
 
 @app.post("/payment/create-checkout")
-async def create_payment_checkout(
+async def create_payment_checkout(request: Request,
     plan_id: str = Form(...),
     user_id: str = Form(...)
 ):
-    """创建支付会话"""
+    """创建支付会话（根据IP选择货币）"""
     try:
-        result = stripe_manager.create_checkout_session(plan_id, user_id)
+        client_ip = get_client_ip(request)
+        result = stripe_manager.create_checkout_session(plan_id, user_id, client_ip=client_ip)
         return result
     except Exception as e:
         return {"success": False, "error": str(e)}

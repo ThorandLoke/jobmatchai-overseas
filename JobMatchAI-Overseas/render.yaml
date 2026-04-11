@@ -3,7 +3,7 @@ services:
     name: jobmatchai-overseas
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn backend_main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY
         sync: false
@@ -13,3 +13,5 @@ services:
         value: 3.12.0
       - key: NOTIFY_ENABLED
         value: "false"
+      - key: STRIPE_SECRET_KEY
+        sync: false
