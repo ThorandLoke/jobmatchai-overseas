@@ -234,14 +234,21 @@ def detect_language(text: str) -> str:
     return 'en'
 
 # === AI 增强简历分析 ===
-def analyze_resume_with_ai(text: str, lang: str = 'en') -> Dict:
-    """使用 AI 深度分析简历"""
+def analyze_resume_with_ai(text: str, lang: str = 'en', job_context: Dict = None) -> Dict:
+    """使用 AI 深度分析简历
+    
+    Args:
+        text: 简历文本
+        lang: 语言代码 (zh/en/da)
+        job_context: 职位上下文，包含 job_title, company, job_description
+    """
     if not AI_AVAILABLE:
-        return analyze_resume_fallback(text, lang)
+        return analyze_resume_fallback(text, lang, job_context)
     
     try:
-        prompts = {
-            'zh': f"""请分析以下简历，以JSON格式返回：
+        # 构建基础 prompt
+        base_prompt = f"""
+请分析以下简历，以JSON格式返回：
 {{
   "skills": ["技能1", "技能2"],
   "experience_years": 数字,
@@ -254,8 +261,110 @@ def analyze_resume_with_ai(text: str, lang: str = 'en') -> Dict:
 }}
 
 简历内容：
-{text[:3000]}""",
-            'en': f"""Please analyze this resume and return JSON:
+{text[:3000]}"""
+        
+        # 如果有职位上下文，添加职位导向的分析
+        if job_context and job_context.get('job_title'):
+            job_title = job_context.get('job_title', '')
+            job_desc = job_context.get('job_description', '')[:500] if job_context.get('job_description') else ''
+            company = job_context.get('company', '')
+            
+            base_prompt = f"""你是一位专业的职业顾问。请对比分析以下简历与目标职位，然后以JSON格式返回分析结果：
+
+目标职位信息：
+- 职位名称：{job_title}
+- 公司：{company if company else '未指定'}
+- 职位描述：{job_desc if job_desc else '无详细描述'}
+
+简历内容：
+{text[:3000]}
+
+请返回JSON格式的分析结果：
+{{
+  "skills": ["检测到的技能1", "技能2"],
+  "experience_years": 数字（工作经验年限）,
+  "strengths": ["优势1", "优势2", "优势3"],
+  "relevant_experience": ["与职位最相关的经验1", "相关经验2"],
+  "job_match_score": 数字（1-100，简历与职位的匹配度）,
+  "missing_skills": ["职位要求但简历中缺少的技能1", "缺少的技能2"],
+  "improvements": [
+    {{"type": "job_relevance", "priority": "high/medium/low", "description": "描述", "suggestion": "针对该职位的改进建议"}}
+  ],
+  "suggested_profile": "针对该职位优化的个人简介（50字以内，突出最相关的经验和技能）",
+  "ats_score": 数字（1-100 ATS友好度评分）,
+  "job_specific_tips": ["针对该职位的申请技巧1", "技巧2"]
+}}
+
+重点：
+1. 突出简历中与目标职位最相关的经验和技能
+2. 指出简历中缺失的职位要求技能
+3. 提供针对该职位的具体改进建议
+4. 评估简历与职位的整体匹配度"""
+        
+        # 根据语言选择 prompt
+        if lang == 'zh':
+            prompt = base_prompt
+        elif lang == 'da':
+            prompt = f"""Du er en professionel karriererådgiver. Analyser følgende CV i forhold til stillingen og returner JSON:
+
+Stilling:
+- Titel: {job_context.get('job_title', 'Ikke angivet') if job_context else 'Ikke angivet'}
+- Virksomhed: {job_context.get('company', '') if job_context else 'Ikke angivet'}
+- Beskrivelse: {job_context.get('job_description', '')[:500] if job_context and job_context.get('job_description') else 'Ingen detaljeret beskrivelse'}
+
+CV:
+{text[:3000]}
+
+Returner JSON:
+{{
+  "skills": ["kompetence1", "kompetence2"],
+  "experience_years": tal,
+  "strengths": ["styrke1", "styrke2", "styrke3"],
+  "relevant_experience": ["relevant erfaring 1", "erfaring 2"],
+  "job_match_score": tal (1-100),
+  "missing_skills": ["manglende kompetence 1", "kompetence 2"],
+  "improvements": [
+    {{"type": "job_relevance", "priority": "high/medium/low", "description": "problem", "suggestion": "forbedring"}}
+  ],
+  "suggested_profile": "profil tilpasset stillingen (under 50 ord)",
+  "ats_score": tal (1-100),
+  "job_specific_tips": ["tips 1", "tips 2"]
+}}"""
+        else:  # English
+            if job_context and job_context.get('job_title'):
+                prompt = f"""You are a professional career consultant. Analyze this resume against the target job and return JSON:
+
+Target Job:
+- Title: {job_context.get('job_title', 'Not specified')}
+- Company: {job_context.get('company', 'Not specified')}
+- Description: {job_context.get('job_description', '')[:500] if job_context.get('job_description') else 'No detailed description'}
+
+Resume:
+{text[:3000]}
+
+Return JSON:
+{{
+  "skills": ["skill1", "skill2"],
+  "experience_years": number,
+  "strengths": ["strength1", "strength2", "strength3"],
+  "relevant_experience": ["relevant experience 1", "experience 2"],
+  "job_match_score": number (1-100),
+  "missing_skills": ["missing skill 1", "skill 2"],
+  "improvements": [
+    {{"type": "job_relevance", "priority": "high/medium/low", "description": "issue", "suggestion": "improvement"}}
+  ],
+  "suggested_profile": "job-specific profile (under 50 words, highlighting most relevant experience and skills)",
+  "ats_score": number (1-100),
+  "job_specific_tips": ["application tip 1", "tip 2"]
+}}
+
+Focus on:
+1. Highlighting experiences and skills most relevant to the target job
+2. Identifying missing skills required by the job
+3. Providing specific improvement suggestions for this job
+4. Assessing overall resume-job fit"""
+            else:
+                prompt = f"""Please analyze this resume and return JSON:
 {{
   "skills": ["skill1", "skill2"],
   "experience_years": number,
@@ -268,50 +377,50 @@ def analyze_resume_with_ai(text: str, lang: str = 'en') -> Dict:
 }}
 
 Resume:
-{text[:3000]}""",
-            'da': f"""Analyser dette CV og returner JSON:
-{{
-  "skills": ["kompetence1", "kompetence2"],
-  "experience_years": tal,
-  "strengths": ["styrke1", "styrke2", "styrke3"],
-  "improvements": [
-    {{"type": "weak_verb", "priority": "high/medium/low", "description": "problem", "suggestion": "forbedring"}}
-  ],
-  "suggested_profile": "foreslået profil (under 50 ord)",
-  "ats_score": tal (1-100 ATS-score)
-}}
-
-CV:
 {text[:3000]}"""
-        }
         
         response = ai_client.chat.completions.create(
             model=AI_MODEL_RESUME or AI_MODEL,
             messages=[
                 {"role": "system", "content": "You are a professional resume analyzer. Return only valid JSON."},
-                {"role": "user", "content": prompts.get(lang, prompts['en'])}
+                {"role": "user", "content": prompt}
             ],
             temperature=0.3,
-            max_tokens=1500
+            max_tokens=2000
         )
         
         result = json.loads(response.choices[0].message.content)
         result['detected_language'] = lang
         result['ai_enhanced'] = True
         result['ai_provider'] = AI_PROVIDER
+        
+        # 如果有职位上下文，添加相关信息
+        if job_context and job_context.get('job_title'):
+            result['job_context'] = {
+                'job_title': job_context.get('job_title', ''),
+                'company': job_context.get('company', ''),
+                'job_match_score': result.get('job_match_score', 0)
+            }
+        
         return result
         
     except Exception as e:
         print(f"AI analysis failed: {e}, using fallback")
         return analyze_resume_fallback(text, lang)
 
-def analyze_resume_fallback(text: str, lang: str = 'en') -> Dict:
-    """本地规则分析（无需AI）"""
+def analyze_resume_fallback(text: str, lang: str = 'en', job_context: Dict = None) -> Dict:
+    """本地规则分析（无需AI）
+    
+    Args:
+        text: 简历文本
+        lang: 语言代码
+        job_context: 职位上下文
+    """
     # 技能关键词库（中英丹）
     skills_db = {
-        'zh': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', '项目管理', '数据分析', 'SQL', '财务', '供应链'],
-        'en': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', 'Project Management', 'Data Analysis', 'SQL', 'Finance', 'Supply Chain'],
-        'da': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', 'Projektledelse', 'Dataanalyse', 'SQL', 'Finans', 'Forsyningskæde']
+        'zh': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', '项目管理', '数据分析', 'SQL', '财务', '供应链', '实施', '顾问', '财务', '供应链', 'AX', 'SAP', 'Oracle'],
+        'en': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', 'Project Management', 'Data Analysis', 'SQL', 'Finance', 'Supply Chain', 'Implementation', 'Consultant', 'AX', 'SAP', 'Oracle'],
+        'da': ['Python', 'Java', 'ERP', 'NetSuite', 'Dynamics', 'Projektledelse', 'Dataanalyse', 'SQL', 'Finans', 'Forsyningskæde', 'Implementering', 'Konsulent', 'AX', 'SAP', 'Oracle']
     }
     
     weak_verbs = {
@@ -339,16 +448,67 @@ def analyze_resume_fallback(text: str, lang: str = 'en') -> Dict:
             'suggestion': {'zh': '使用更强动词如"主导"、"实现"', 'en': 'Use stronger verbs like "led", "achieved"', 'da': 'Brug stærkere verber'}.get(lang, 'Use stronger verbs')
         })
     
+    # 计算与职位的匹配度（如果有职位上下文）
+    job_match_score = 50  # 默认值
+    relevant_experience = []
+    missing_skills = []
+    job_specific_tips = []
+    
+    if job_context and job_context.get('job_title'):
+        job_title = job_context.get('job_title', '').lower()
+        job_desc = job_context.get('job_description', '').lower()
+        job_text = job_title + ' ' + job_desc
+        
+        # 计算匹配的技能数量
+        matched_skills = [s for s in detected_skills if s.lower() in job_text]
+        job_match_score = min(95, 40 + len(matched_skills) * 8)
+        
+        # 找出缺失的职位要求技能
+        job_required_skills = ['ERP', 'NetSuite', 'Dynamics', 'AX', 'SAP', 'Finance', 'SQL', 'Supply Chain']
+        missing_skills = [s for s in job_required_skills if s.lower() not in job_text]
+        
+        # 生成相关经验提示
+        if 'netSuite' in job_text.lower() and 'netsuite' in text_lower:
+            relevant_experience.append({'zh': 'NetSuite实施经验', 'en': 'NetSuite implementation experience', 'da': 'NetSuite implementeringserfaring'}.get(lang, 'NetSuite experience'))
+        if 'dynamics' in job_text.lower() or 'ax' in job_text.lower():
+            if 'dynamics' in text_lower or 'ax' in text_lower:
+                relevant_experience.append({'zh': 'Dynamics AX实施经验', 'en': 'Dynamics AX implementation experience', 'da': 'Dynamics AX implementeringserfaring'}.get(lang, 'Dynamics AX experience'))
+        if 'finance' in job_text.lower() and 'finance' in text_lower:
+            relevant_experience.append({'zh': '财务模块经验', 'en': 'Finance module experience', 'da': 'Finansmodulerfaring'}.get(lang, 'Finance experience'))
+        
+        # 职位特定的改进建议
+        if job_match_score < 60:
+            job_specific_tips.append({
+                'zh': f'建议突出 {len(matched_skills)} 项相关技能：{", ".join(matched_skills[:3])}',
+                'en': f'Highlight {len(matched_skills)} relevant skills: {", ".join(matched_skills[:3])}',
+                'da': f'Fremhæv {len(matched_skills)} relevante kompetencer: {", ".join(matched_skills[:3])}'
+            }.get(lang, f'Highlight {len(matched_skills)} relevant skills'))
+        
+        improvements.append({
+            'type': 'job_relevance',
+            'priority': 'high' if job_match_score < 60 else 'medium',
+            'description': {'zh': f'简历与职位匹配度：{job_match_score}%', 'en': f'Resume-Job Match Score: {job_match_score}%', 'da': f'CV-Job Match Score: {job_match_score}%'}.get(lang, f'Match: {job_match_score}%'),
+            'suggestion': {'zh': '根据职位要求调整简历重点', 'en': 'Tailor resume to job requirements', 'da': 'Tilpas CV til jobkrav'}.get(lang, 'Tailor to job')
+        })
+    
     years = re.findall(r'(\d+)\s*(?:年|years?|år)', text_lower)
     exp_years = max([int(y) for y in years] + [0])
     
-    profile_templates = {
-        'zh': f'拥有{exp_years}年ERP系统实施经验，精通NetSuite和Dynamics AX。',
-        'en': f'Experienced ERP professional with {exp_years}+ years in NetSuite and Dynamics AX.',
-        'da': f'Erfaren ERP-professionel med {exp_years}+ års erfaring i NetSuite og Dynamics AX.'
-    }
+    # 根据是否有职位上下文生成不同的简介
+    if job_context and job_context.get('job_title'):
+        profile_templates = {
+            'zh': f'拥有{exp_years}年ERP系统实施经验，精通{", ".join(detected_skills[:2]) if detected_skills else "NetSuite和Dynamics"}。',
+            'en': f'ERP professional with {exp_years}+ years. Expertise in {", ".join(detected_skills[:2]) if detected_skills else "NetSuite and Dynamics"}.',
+            'da': f'ERP-professionel med {exp_years}+ års erfaring. Ekspertise i {", ".join(detected_skills[:2]) if detected_skills else "NetSuite og Dynamics"}.'
+        }
+    else:
+        profile_templates = {
+            'zh': f'拥有{exp_years}年ERP系统实施经验，精通NetSuite和Dynamics AX。',
+            'en': f'Experienced ERP professional with {exp_years}+ years in NetSuite and Dynamics AX.',
+            'da': f'Erfaren ERP-professionel med {exp_years}+ års erfaring i NetSuite og Dynamics AX.'
+        }
     
-    return {
+    result = {
         'skills': detected_skills,
         'experience_years': exp_years,
         'strengths': detected_skills[:3] if detected_skills else ['ERP', 'Project Management'],
@@ -358,6 +518,20 @@ def analyze_resume_fallback(text: str, lang: str = 'en') -> Dict:
         'detected_language': lang,
         'ai_enhanced': False
     }
+    
+    # 如果有职位上下文，添加相关信息
+    if job_context and job_context.get('job_title'):
+        result['job_context'] = {
+            'job_title': job_context.get('job_title', ''),
+            'company': job_context.get('company', ''),
+            'job_match_score': job_match_score
+        }
+        result['job_match_score'] = job_match_score
+        result['relevant_experience'] = relevant_experience
+        result['missing_skills'] = missing_skills[:5]
+        result['job_specific_tips'] = job_specific_tips
+    
+    return result
 
 # 保持向后兼容
 analyze_resume = analyze_resume_with_ai
@@ -773,105 +947,10 @@ def search_usa(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
         print(f"USAJOBS API Error: {e}")
         return []
 
-# === 中国职位搜索（演示数据）===
+# === 中国职位搜索 ===
 # 注意：中国主流招聘平台（前程无忧、智联、Boss直聘）均无公开免费API
-# 政府网站（人社部公共招聘网）也无开放接口
-# 如需真实数据，建议申请企查查API（企业实名，0.5元/次）
-CHINA_DEMO_JOBS = [
-    {
-        "title": "ERP实施顾问（NetSuite/Dynamics）",
-        "company": "华为技术有限公司",
-        "location": "深圳",
-        "description": "负责企业ERP系统实施，负责财务模块或供应链模块的规划与落地。要求5年以上ERP实施经验，熟悉NetSuite或SAP。",
-        "url": "https://career.huawei.com",
-        "date": "2026-03-28",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    },
-    {
-        "title": "Dynamics 365 F&O高级顾问",
-        "company": "微软中国有限公司",
-        "location": "北京",
-        "description": "为企业客户提供Dynamics 365 Finance & Operations实施服务，负责项目管理与客户需求分析。英语可作为工作语言。",
-        "url": "https://careers.microsoft.com",
-        "date": "2026-03-27",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    },
-    {
-        "title": "Oracle NetSuite实施工程师",
-        "company": "阿里巴巴集团",
-        "location": "杭州",
-        "description": "参与NetSuite项目实施，负责需求调研、方案设计与系统上线。具备Oracle NetSuite认证优先。",
-        "url": "https://talent.alibaba.com",
-        "date": "2026-03-26",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    },
-    {
-        "title": "SAP FICO模块顾问",
-        "company": "中石化数字化公司",
-        "location": "上海",
-        "description": "负责SAP FICO模块的实施与优化，进行业务调研、方案设计及用户培训。",
-        "url": "https://sinopec.com",
-        "date": "2026-03-25",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    },
-    {
-        "title": "ERP项目经理",
-        "company": "腾讯科技有限公司",
-        "location": "深圳",
-        "description": "主导ERP项目整体规划与执行，管理项目团队与客户关系，协调各方资源确保项目按时交付。",
-        "url": "https://careers.tencent.com",
-        "date": "2026-03-24",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    },
-    {
-        "title": "供应链系统分析师",
-        "company": "京东集团",
-        "location": "北京",
-        "description": "分析供应链业务需求，设计并优化ERP系统流程，推进供应链数字化转型。",
-        "url": "https://careers.jd.com",
-        "date": "2026-03-23",
-        "source": "🇨🇳 演示数据",
-        "language": "zh"
-    }
-]
-
-def search_china(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
-    """搜索中国职位（演示数据）
-    
-    ⚠️ 注意：这是演示数据！
-    
-    中国主流招聘平台均无免费公开API：
-    - 前程无忧(51job)：无公开API
-    - 智联招聘：无公开API  
-    - Boss直聘：需企业资质（Boss Hi平台）
-    - 人社部公共招聘网：无开放接口
-    
-    如需真实数据，可申请：
-    - 企查查API：企业实名，0.5元/次
-    """
-    # 关键词过滤：模拟根据关键词筛选
-    if keyword:
-        keyword_lower = keyword.lower()
-        filtered = [j for j in CHINA_DEMO_JOBS 
-                   if keyword_lower in j["title"].lower() 
-                   or keyword_lower in j["description"].lower()
-                   or keyword_lower in j["company"].lower()]
-    else:
-        filtered = CHINA_DEMO_JOBS
-    
-    # 地点过滤
-    if location:
-        location_lower = location.lower()
-        filtered = [j for j in filtered 
-                   if location_lower in j["location"] 
-                   or location_lower in j["location"].lower()]
-    
-    return filtered[:limit]
+# 搜索中国职位请用户粘贴职位文本，详见 paste 模式
+# 中国职位需要用户手动粘贴，不支持自动搜索
 
 # === 启动时初始化IP地理数据库 ===
 import ip_geo
@@ -1041,16 +1120,36 @@ If information is not found, use empty string or empty array."""
 @app.post("/analyze-resume")
 async def analyze_resume_endpoint(
     resume_text: str = Form(...),
-    language: str = Form("auto")
+    language: str = Form("auto"),
+    job_title: str = Form(""),
+    job_description: str = Form(""),
+    company: str = Form("")
 ):
-    """分析简历并返回改进建议"""
+    """分析简历并返回改进建议
+    
+    可选参数:
+    - job_title: 目标职位名称
+    - job_description: 职位描述
+    - company: 公司名称
+    
+    如果提供职位上下文，将返回针对该职位的匹配分析和改进建议
+    """
     try:
         if language == "auto":
             lang = detect_language(resume_text)
         else:
             lang = language
         
-        analysis = analyze_resume(resume_text, lang)
+        # 构建职位上下文
+        job_context = None
+        if job_title or job_description:
+            job_context = {
+                'job_title': job_title,
+                'job_description': job_description,
+                'company': company
+            }
+        
+        analysis = analyze_resume(resume_text, lang, job_context)
         
         return {
             "success": True,
@@ -1259,7 +1358,7 @@ async def search_jobs(
     """统一职位搜索 API
     
     支持的 country 参数:
-    - all: 搜索所有来源
+    - all: 搜索所有来源（英国、德国、瑞典、丹麦、美国）
     - gb: 英国 (Adzuna)
     - au: 澳大利亚 (Adzuna)
     - ca: 加拿大 (Adzuna)
@@ -1270,43 +1369,27 @@ async def search_jobs(
     - se: 瑞典 (Jobtechdev)
     - dk: 丹麦 (Jobinsats)
     - us: 美国 (USAJOBS)
-    - cn: 中国 (演示数据)
     """
     all_jobs = []
     
     try:
         if country == "all":
-            # 搜索所有来源
-            # 中国（演示数据）
-            all_jobs.extend(search_china(keyword, location, limit))
-            # 国际 (UK)
+            # 搜索所有来源（英国、德国、瑞典、丹麦、美国）
             all_jobs.extend(search_adzuna(keyword, "gb", location, limit))
-            # 德国
             all_jobs.extend(search_germany(keyword, location, limit))
-            # 瑞典
             all_jobs.extend(search_sweden(keyword, location, limit))
-            # 丹麦
             all_jobs.extend(search_denmark(keyword, location, limit))
-            # 美国
             all_jobs.extend(search_usa(keyword, location, limit))
         elif country in ["gb", "au", "ca", "fr", "nl", "be"]:
-            # Adzuna 国家
             all_jobs.extend(search_adzuna(keyword, country, location, limit))
         elif country == "de":
-            # 德国
             all_jobs.extend(search_germany(keyword, location, limit))
         elif country == "se":
-            # 瑞典
             all_jobs.extend(search_sweden(keyword, location, limit))
         elif country == "dk":
-            # 丹麦
             all_jobs.extend(search_denmark(keyword, location, limit))
         elif country == "us":
-            # 美国
             all_jobs.extend(search_usa(keyword, location, limit))
-        elif country == "cn":
-            # 中国（演示数据）
-            all_jobs.extend(search_china(keyword, location, limit))
         else:
             return {"success": False, "error": f"不支持的国家: {country}"}
         
@@ -1325,7 +1408,6 @@ def get_job_sources():
         "success": True,
         "sources": [
             {"id": "all", "name": "全部来源", "flag": "🌐"},
-            {"id": "cn", "name": "中国（演示）", "flag": "🇨🇳", "api": "Demo Data"},
             {"id": "gb", "name": "英国", "flag": "🇬🇧", "api": "Adzuna"},
             {"id": "au", "name": "澳大利亚", "flag": "🇦🇺", "api": "Adzuna"},
             {"id": "ca", "name": "加拿大", "flag": "🇨🇦", "api": "Adzuna"},

@@ -21,7 +21,9 @@ Copyright © 2026 JobMatchAI. All rights reserved.
     
     <script>
         // ⚙️ API 配置
+        // API Key 由后端管理，前端不需要
         const API_KEY = '';
+        const API_BASE = 'https://jobmatchai-overseas.onrender.com';
     </script>
     
     <style>
@@ -380,53 +382,51 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
         <!-- Hero Section - 产品亮点 -->
         <div class="hero-section" style="padding: 20px 0;">
-            <h1>🚀 <span class="gradient-text">专业简历精修 + 精准求职信，让每次申请都更有竞争力</span></h1>
+            <h1>🚀 <span class="gradient-text">AI驱动 · 精准匹配 · 专属定制</span></h1>
+            <p style="color: #aaa; margin-top: 8px; font-size: 0.95rem;">根据您的目标职位，智能优化简历，生成专属求职信</p>
             
-            <!-- 3步引导流程 -->
+            <!-- 新3步引导流程 -->
             <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px;">
-                <span style="color: #ffd700; font-weight: 600;">第一步</span>
-                <span>📄</span>
-                <span style="color: #ccc; font-size: 0.9rem;">上传简历</span>
-                <span style="color: rgba(255,255,255,0.3);">→</span>
-                <span style="color: #ffd700; font-weight: 600;">第二步</span>
-                <span>🌍</span>
-                <span style="color: #ccc; font-size: 0.9rem;">精修/翻译</span>
-                <span style="color: rgba(255,255,255,0.3);">→</span>
-                <span style="color: #ffd700; font-weight: 600;">第三步</span>
+                <span style="color: #ffd700; font-weight: 600;">①</span>
                 <span>💼</span>
-                <span style="color: #ccc; font-size: 0.9rem;">匹配分析</span>
+                <span style="color: #ccc; font-size: 0.9rem;">选职位</span>
+                <span style="color: rgba(255,255,255,0.3);">→</span>
+                <span style="color: #ffd700; font-weight: 600;">②</span>
+                <span>📄</span>
+                <span style="color: #ccc; font-size: 0.9rem;">精修简历</span>
+                <span style="color: rgba(255,255,255,0.3);">→</span>
+                <span style="color: #ffd700; font-weight: 600;">③</span>
+                <span>✉️</span>
+                <span style="color: #ccc; font-size: 0.9rem;">生成求职信</span>
             </div>
             
             <!-- 立即开始按钮 -->
-            <button class="btn btn-primary" onclick="switchTab('resume')" style="font-size: 1.1rem; padding: 14px 32px; margin-top: 20px;">
-                📄 立即开始：精修简历
+            <button class="btn btn-primary" onclick="switchTab('search')" style="font-size: 1.1rem; padding: 14px 32px; margin-top: 20px;">
+                💼 从选职位开始 →
             </button>
         </div>
         
         <!-- 价值主张卡片 -->
         <div class="value-props" style="gap: 12px;">
             <div class="prop-card" style="padding: 16px;">
-                <div class="prop-icon" style="font-size: 1.2rem;">💎</div>
-                <h3 style="font-size: 0.95rem;">专业简历精修</h3>
-                <p style="font-size: 0.85rem;">在真实基础上优化表达，使简历更符合商务求职标准，提升专业形象</p>
+                <div class="prop-icon" style="font-size: 1.2rem;">🎯</div>
+                <h3 style="font-size: 0.95rem;">职位导向精准优化</h3>
+                <p style="font-size: 0.85rem;">根据目标职位要求，智能突出简历中最相关的技能与经验</p>
             </div>
             <div class="prop-card" style="padding: 16px;">
                 <div class="prop-icon" style="font-size: 1.2rem;">✍️</div>
-                <h3 style="font-size: 0.95rem;">求职申请参考</h3>
-                <p style="font-size: 0.85rem;">多语言支持，基于简历与职位信息提供申请参考，助力求职准备</p>
-            </div>
-            <div class="prop-card" style="padding: 16px;">
-                <div class="prop-icon" style="font-size: 1.2rem;">🎯</div>
-                <h3 style="font-size: 0.95rem;">评估申请成功率</h3>
-                <p style="font-size: 0.85rem;">智能分析简历与职位的匹配度，为您的申请策略提供参考建议</p>
+                <h3 style="font-size: 0.95rem;">专属求职信</h3>
+                <p style="font-size: 0.85rem;">基于职位与简历，生成独一无二的定制求职信，让招聘官眼前一亮</p>
             </div>
         </div>
         
-        <!-- 功能标签页 -->
+        <!-- 功能标签页 - 新流程：职位 → 简历 → 求职信 -->
         <div class="tabs" style="flex-wrap:wrap;gap:6px;">
-            <div class="tab active" onclick="switchTab('resume')">📄 精修简历</div>
-            <div class="tab" onclick="switchTab('search')">💼 意向职位</div>
-            <div class="tab" onclick="switchTab('cover')">✉️ 求职申请</div>
+            <div class="tab active" onclick="switchTab('search')">💼 1. 意向职位</div>
+            <div class="tab" onclick="switchTab('resume')">📄 2. 精修简历</div>
+            <div class="tab" onclick="switchTab('cover')">✉️ 3. 专属求职信</div>
+            <div class="tab" onclick="switchTab('templates')">📋 简历模版</div>
+            <div class="tab" onclick="switchTab('learning')">📚 学习资源</div>
             <div class="tab" onclick="switchTab('payment')">⭐ 成为会员</div>
         </div>
         
@@ -521,44 +521,6 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 <div id="savedJobs" class="hidden" style="margin-top: 16px;">
                     <h4 style="color: #00d4ff; margin-bottom: 10px;">📁 已保存的职位</h4>
                     <div id="jobsList"></div>
-                </div>
-                
-                <!-- 职位搜索功能 -->
-                <div style="margin-top: 24px; padding: 16px; background: linear-gradient(135deg, rgba(0,212,255,0.1), rgba(100,200,100,0.1)); border-radius: 12px; border: 1px solid rgba(0,212,255,0.3);">
-                    <h3 style="color: #00d4ff; margin-bottom: 12px;">🔍 搜索更多职位</h3>
-                    <p style="color: #ccc; font-size: 0.85rem; margin-bottom: 12px;">从多个国家的招聘平台搜索职位</p>
-                    
-                    <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
-                        <input type="text" id="jobSearchKeyword" placeholder="关键词，如: ERP, Dynamics AX, NetSuite" style="flex: 2; min-width: 150px; padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.4); background: rgba(0,0,0,0.3); color: #fff;">
-                        <select id="jobSearchCountry" style="flex: 1; min-width: 120px; padding: 10px; border-radius: 8px; border: 1px solid rgba(0,212,255,0.4); background: rgba(0,0,0,0.3); color: #fff;">
-                            <option value="all">🌐 全部国家</option>
-                            <option value="dk">🇩🇰 丹麦</option>
-                            <option value="se">🇸🇪 瑞典</option>
-                            <option value="de">🇩🇪 德国</option>
-                            <option value="us">🇺🇸 美国</option>
-                            <option value="gb">🇬🇧 英国</option>
-                            <option value="nl">🇳🇱 荷兰</option>
-                            <option value="au">🇦🇺 澳大利亚</option>
-                            <option value="ca">🇨🇦 加拿大</option>
-                        </select>
-                        <button class="btn btn-primary" onclick="searchJobs()" style="flex: 0; white-space: nowrap;">
-                            🔍 搜索
-                        </button>
-                    </div>
-                    
-                    <div id="jobSearchLoading" class="hidden" style="text-align: center; padding: 20px;">
-                        <span style="color: #00d4ff;">搜索中...</span>
-                    </div>
-                    
-                    <div id="jobSearchResults" class="hidden" style="margin-top: 12px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <span id="jobSearchCount" style="color: #ccc; font-size: 0.85rem;"></span>
-                            <button onclick="clearJobSearch()" style="background: none; border: none; color: #888; cursor: pointer; font-size: 0.85rem;">✕ 清除</button>
-                        </div>
-                        <div id="jobSearchList"></div>
-                    </div>
-                    
-                    <div id="jobSearchError" class="hidden" style="padding: 12px; background: rgba(255,0,0,0.1); border-radius: 8px; color: #ff6b6b; font-size: 0.85rem; margin-top: 12px;"></div>
                 </div>
             </div>
         </div>
@@ -897,6 +859,194 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             </div>
 </div>
 
+        <!-- 简历模版页面 -->
+        <div id="templatesTab" class="tab-content hidden">
+            <div class="card">
+                <h2>📋 简历模版库</h2>
+                <p style="color:#ccc;margin-bottom:20px;">
+                    选择专业设计的简历模版，让您的求职申请更具竞争力。点击模版查看大图预览。
+                </p>
+                
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;">
+                    <!-- Classic 模版 -->
+                    <div class="template-card" onclick="showTemplatePreview('classic')" style="background:linear-gradient(135deg,#1a365d,#2c5282);border-radius:12px;padding:24px;cursor:pointer;transition:all 0.3s;border:2px solid transparent;" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='transparent'">
+                        <div style="background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="height:8px;background:#1a365d;border-radius:2px;margin-bottom:8px;width:60%;"></div>
+                            <div style="height:4px;background:#bee3f8;border-radius:2px;margin-bottom:4px;width:80%;"></div>
+                            <div style="height:4px;background:#bee3f8;border-radius:2px;margin-bottom:12px;width:70%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:90%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:85%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:12px;width:75%;"></div>
+                            <div style="height:4px;background:#c9a227;border-radius:2px;margin-bottom:3px;width:50%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:90%;"></div>
+                        </div>
+                        <h3 style="color:#fff;margin-bottom:8px;">经典专业型</h3>
+                        <p style="color:#bee3f8;font-size:0.85rem;">经典专业型 · 适合金融/咨询行业</p>
+                        <div style="margin-top:12px;padding:8px 12px;background:rgba(201,162,39,0.2);border-radius:6px;text-align:center;">
+                            <span style="color:#c9a227;font-size:0.85rem;">🎯 点击预览</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Modern 模版 -->
+                    <div class="template-card" onclick="showTemplatePreview('modern')" style="background:linear-gradient(135deg,#2d3748,#4a5568);border-radius:12px;padding:24px;cursor:pointer;transition:all 0.3s;border:2px solid transparent;" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='transparent'">
+                        <div style="background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="display:flex;align-items:center;margin-bottom:12px;">
+                                <div style="width:40px;height:40px;background:linear-gradient(135deg,#00d4ff,#0099cc);border-radius:50%;margin-right:12px;"></div>
+                                <div style="flex:1;">
+                                    <div style="height:6px;background:#2d3748;border-radius:2px;margin-bottom:4px;width:70%;"></div>
+                                    <div style="height:4px;background:#a0aec0;border-radius:2px;width:50%;"></div>
+                                </div>
+                            </div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:100%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:8px;width:90%;"></div>
+                            <div style="display:flex;gap:4px;margin-bottom:8px;">
+                                <div style="height:20px;width:50px;background:#00d4ff;border-radius:4px;"></div>
+                                <div style="height:20px;width:70px;background:#e2e8f0;border-radius:4px;"></div>
+                                <div style="height:20px;width:40px;background:#e2e8f0;border-radius:4px;"></div>
+                            </div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:95%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;width:85%;"></div>
+                        </div>
+                        <h3 style="color:#fff;margin-bottom:8px;">现代简约型</h3>
+                        <p style="color:#a0aec0;font-size:0.85rem;">现代简约型 · 适合IT/科技行业</p>
+                        <div style="margin-top:12px;padding:8px 12px;background:rgba(0,212,255,0.2);border-radius:6px;text-align:center;">
+                            <span style="color:#00d4ff;font-size:0.85rem;">🎯 点击预览</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Creative 模版 -->
+                    <div class="template-card" onclick="showTemplatePreview('creative')" style="background:linear-gradient(135deg,#553c9a,#805ad5);border-radius:12px;padding:24px;cursor:pointer;transition:all 0.3s;border:2px solid transparent;" onmouseover="this.style.borderColor='#00d4ff'" onmouseout="this.style.borderColor='transparent'">
+                        <div style="background:#fff;border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3);">
+                            <div style="display:flex;align-items:center;margin-bottom:12px;">
+                                <div style="width:50px;height:50px;background:linear-gradient(135deg,#553c9a,#805ad5);border-radius:8px;margin-right:12px;"></div>
+                                <div>
+                                    <div style="height:6px;background:#553c9a;border-radius:2px;margin-bottom:4px;width:80px;"></div>
+                                    <div style="height:4px;background:#9f7aea;border-radius:2px;width:60px;"></div>
+                                </div>
+                            </div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:100%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:8px;width:88%;"></div>
+                            <div style="height:20px;background:linear-gradient(90deg,#553c9a,transparent);border-radius:4px;margin-bottom:8px;width:60%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;margin-bottom:3px;width:92%;"></div>
+                            <div style="height:4px;background:#e2e8f0;border-radius:2px;width:78%;"></div>
+                        </div>
+                        <h3 style="color:#fff;margin-bottom:8px;">创意活力型</h3>
+                        <p style="color:#d6bcfa;font-size:0.85rem;">创意活力型 · 适合创意/营销行业</p>
+                        <div style="margin-top:12px;padding:8px 12px;background:rgba(159,122,234,0.2);border-radius:6px;text-align:center;">
+                            <span style="color:#d6bcfa;font-size:0.85rem;">🎯 点击预览</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 外部模版推荐 -->
+                <div style="margin-top:32px;padding:20px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:12px;">
+                    <h3 style="color:#00d4ff;margin-bottom:12px;">🌐 更多模版资源</h3>
+                    <p style="color:#ccc;font-size:0.9rem;margin-bottom:16px;">
+                        我们还推荐以下专业简历模版平台，点击图标前往选择：
+                    </p>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                        <a href="https://www.canva.com/resumes/" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(255,255,255,0.1);border-radius:8px;text-decoration:none;color:#fff;transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                            <span style="font-size:1.5rem;">🎨</span>
+                            <span>Canva 简历模版</span>
+                        </a>
+                        <a href="https://zety.com/blog/resume-templates" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(255,255,255,0.1);border-radius:8px;text-decoration:none;color:#fff;transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                            <span style="font-size:1.5rem;">📝</span>
+                            <span>Zety 简历工具</span>
+                        </a>
+                        <a href="https://resume.io/" target="_blank" style="display:flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(255,255,255,0.1);border-radius:8px;text-decoration:none;color:#fff;transition:all 0.3s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                            <span style="font-size:1.5rem;">✨</span>
+                            <span>Resume.io 在线简历</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 学习资源页面 -->
+        <div id="learningTab" class="tab-content hidden">
+            <div class="card">
+                <h2>📚 学习资源</h2>
+                <p style="color:#ccc;margin-bottom:20px;">
+                    根据您的技能差距推荐优质学习资源，助力求职竞争力提升。
+                </p>
+                
+                <!-- B站资源推荐 -->
+                <div style="margin-bottom:24px;">
+                    <h3 style="color:#00d4ff;margin-bottom:12px;">🎬 B站学习频道推荐</h3>
+                    <p style="color:#ccc;font-size:0.9rem;margin-bottom:16px;">
+                        B站有大量优质的职场技能和简历制作教程，以下是热门推荐：
+                    </p>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">
+                        <a href="https://search.bilibili.com/all?keyword=简历制作" target="_blank" style="display:block;padding:16px;background:rgba(255,105,180,0.15);border:1px solid rgba(255,105,180,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,105,180,0.6)'">
+                            <div style="color:#ff69b4;font-weight:600;margin-bottom:4px;">🎯 简历制作教程</div>
+                            <div style="color:#ccc;font-size:0.85rem;">搜索关键词：简历制作/简历优化</div>
+                        </a>
+                        <a href="https://search.bilibili.com/all?keyword=求职面试技巧" target="_blank" style="display:block;padding:16px;background:rgba(255,105,180,0.15);border:1px solid rgba(255,105,180,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,105,180,0.6)'">
+                            <div style="color:#ff69b4;font-weight:600;margin-bottom:4px;">💼 求职面试技巧</div>
+                            <div style="color:#ccc;font-size:0.85rem;">搜索关键词：面试技巧/职场</div>
+                        </a>
+                        <a href="https://search.bilibili.com/all?keyword=职场英语" target="_blank" style="display:block;padding:16px;background:rgba(255,105,180,0.15);border:1px solid rgba(255,105,180,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;" onmouseover="this.style.borderColor='rgba(255,105,180,0.6)'">
+                            <div style="color:#ff69b4;font-weight:600;margin-bottom:4px;">🌍 职场英语</div>
+                            <div style="color:#ccc;font-size:0.85rem;">搜索关键词：职场英语/商务英语</div>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 岗位技能课程 -->
+                <div style="margin-bottom:24px;">
+                    <h3 style="color:#6bcf7f;margin-bottom:12px;">🎯 岗位技能课程</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+                        <a href="https://www.coursera.org/search?query=job+search" target="_blank" class="course-card" style="display:block;padding:16px;background:rgba(107,207,127,0.1);border:1px solid rgba(107,207,127,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(107,207,127,0.6)';this.style.background='rgba(107,207,127,0.2)'">
+                            <div style="font-weight:600;margin-bottom:8px;">📚 Coursera</div>
+                            <div style="color:#6bcf7f;font-size:0.9rem;">求职技能专项课程</div>
+                            <div style="color:#ccc;font-size:0.8rem;margin-top:4px;">专业课程 + 证书</div>
+                        </a>
+                        <a href="https://www.linkedin.com/learning/topics/job-hunting" target="_blank" class="course-card" style="display:block;padding:16px;background:rgba(10,102,194,0.15);border:1px solid rgba(10,102,194,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(10,102,194,0.6)';this.style.background='rgba(10,102,194,0.25)'">
+                            <div style="font-weight:600;margin-bottom:8px;">💼 LinkedIn Learning</div>
+                            <div style="color:#64a0e0;font-size:0.9rem;">求职攻略合集</div>
+                            <div style="color:#ccc;font-size:0.8rem;margin-top:4px;">职场技能 + 面试准备</div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 简历技能提升 -->
+                <div style="margin-bottom:24px;">
+                    <h3 style="color:#ffd700;margin-bottom:12px;">📝 简历技能提升</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+                        <a href="https://www.grammarly.com/" target="_blank" style="display:block;padding:16px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(255,215,0,0.6)'">
+                            <div style="color:#ffd700;font-weight:600;margin-bottom:4px;">✍️ Grammarly</div>
+                            <div style="color:#ccc;font-size:0.85rem;">英文语法检查，提升简历专业度</div>
+                        </a>
+                        <a href="https://www.indeed.com/career-advice/resumes-cover-letters" target="_blank" style="display:block;padding:16px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(255,215,0,0.6)'">
+                            <div style="color:#ffd700;font-weight:600;margin-bottom:4px;">📄 Indeed 简历指南</div>
+                            <div style="color:#ccc;font-size:0.85rem;">简历写作指南 + 示例</div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 求职技巧 -->
+                <div>
+                    <h3 style="color:#ff9800;margin-bottom:12px;">💡 求职技巧</h3>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;">
+                        <a href="https://www.glassdoor.com/blog/category/career-advice/" target="_blank" style="display:block;padding:16px;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(255,152,0,0.6)'">
+                            <div style="color:#ff9800;font-weight:600;margin-bottom:4px;">🏢 Glassdoor 职业发展</div>
+                            <div style="color:#ccc;font-size:0.85rem;">公司评价 + 求职建议</div>
+                        </a>
+                        <a href="https://www.linkedin.com/pulse" target="_blank" style="display:block;padding:16px;background:rgba(255,152,0,0.1);border:1px solid rgba(255,152,0,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" onmouseover="this.style.borderColor='rgba(255,152,0,0.6)'">
+                            <div style="color:#ff9800;font-weight:600;margin-bottom:4px;">📰 LinkedIn 洞察</div>
+                            <div style="color:#ccc;font-size:0.85rem;">职场洞察 + 行业趋势</div>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 免责声明 -->
+                <div style="margin-top:24px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-size:0.8rem;color:#888;text-align:center;">
+                    ⚠️ 以上资源链接仅供参考，点击后跳转至第三方平台。<br>
+                    我们不对第三方内容负责，使用前请自行了解其服务条款。
+                </div>
+            </div>
+        </div>
+
         <!-- 成为会员页面 -->
         <div id="paymentTab" class="tab-content hidden">
             <div class="card">
@@ -1113,6 +1263,42 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const random = Math.random().toString(36).substring(2, 10);
             return `user_${timestamp}_${random}`;
         }
+
+        // ===== Thor专属会员权限 👑 =====
+        // 使用方式：在浏览器控制台输入 unlockPremium() 即可开通年度会员
+        window.unlockPremium = function() {
+            const uid = getSessionUserId();
+            // 永久存储（localStorage，重启浏览器后仍有效）
+            localStorage.setItem('jobmatchai_premium', 'true');
+            // 也通知后端（当前会话有效）
+            fetch('/payment/activate-demo', {
+                method: 'POST',
+                body: new URLSearchParams({ plan_id: 'yearly', user_id: uid })
+            }).then(r => r.json()).then(d => {
+                if (d.success) {
+                    showToast('🎉 会员已开通！年度计划已激活');
+                    loadPaymentPlans(); // 刷新会员状态显示
+                } else {
+                    showToast('✅ 本地会员已开通（年度会员）');
+                }
+            }).catch(() => {
+                showToast('✅ 会员已开通！（年度会员 · 本地模式）');
+            });
+            console.log('👑 Premium activated for user:', uid);
+        };
+
+        // 启动时自动检测并激活会员（Thor专属）
+        (function autoPremiumCheck() {
+            const stored = localStorage.getItem('jobmatchai_premium');
+            if (stored === 'true') {
+                const uid = getSessionUserId();
+                // 静默激活，不打扰
+                fetch('/payment/activate-demo', {
+                    method: 'POST',
+                    body: new URLSearchParams({ plan_id: 'yearly', user_id: uid })
+                }).catch(() => {});
+            }
+        })();
         
         // =============================================
         // Null-safe DOM helper - 防止访问不存在的元素导致崩溃
@@ -1373,16 +1559,10 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             btn.textContent = '🔄 分析中...';
             loadingDiv.classList.remove('hidden');
             
-            // 模拟进度条动画
+            // 模拟进度条动画（消息在下面根据职位上下文重新定义）
             let progress = 0;
             const progressText = document.getElementById('analyzeProgressText');
             const progressFill = document.getElementById('analyzeProgressFill');
-            const progressMessages = [
-                '🤖 AI正在解析简历结构...',
-                '📋 识别工作经历与技能...',
-                '🎯 提炼核心竞争优势...',
-                '✨ 即将完成分析...'
-            ];
             
             if (analyzeProgressInterval) clearInterval(analyzeProgressInterval);
             analyzeProgressInterval = setInterval(() => {
@@ -1394,9 +1574,29 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 400);
             
             try {
+                // 获取职位上下文
+                const jobTitle = document.getElementById('manualJobTitle')?.value || '';
+                const jobDesc = document.getElementById('manualJobDesc')?.value || '';
+                const company = document.getElementById('manualCompany')?.value || '';
+                
+                // 增强进度消息
+                const progressMessages = [
+                    '🤖 AI正在解析简历结构...',
+                    jobTitle ? `📋 分析与"${jobTitle}"的匹配度...` : '📋 识别工作经历与技能...',
+                    '🎯 提炼核心竞争优势...',
+                    jobTitle ? `✨ 生成职位匹配建议...` : '✨ 即将完成分析...'
+                ];
+                
                 const formData = new FormData();
                 formData.append('resume_text', text);
                 formData.append('language', 'auto');
+                
+                // 如果有职位上下文，添加到请求中
+                if (jobTitle || jobDesc) {
+                    formData.append('job_title', jobTitle);
+                    formData.append('job_description', jobDesc);
+                    formData.append('company', company);
+                }
                 
                 const res = await fetch('/analyze-resume', {
                     method: 'POST',
@@ -1452,6 +1652,75 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             let html = '';
             
+            // === 职位匹配度卡片（如果有职位上下文）===
+            if (analysis.job_match_score !== undefined) {
+                const score = analysis.job_match_score;
+                let scoreColor = '#ff6b6b';
+                let scoreLabel = '匹配度较低';
+                if (score >= 80) { scoreColor = '#6bcf7f'; scoreLabel = '高度匹配'; }
+                else if (score >= 60) { scoreColor = '#ffd93d'; scoreLabel = '匹配度良好'; }
+                else if (score >= 40) { scoreColor = '#ff9f43'; scoreLabel = '匹配度一般'; }
+                
+                const jobTitle = analysis.job_context?.job_title || '目标职位';
+                const company = analysis.job_context?.company || '';
+                
+                html += `
+                    <div class="form-group" style="background: linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,153,204,0.1)); border: 1px solid rgba(0,212,255,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div>
+                                <h3 style="color: #00d4ff; margin: 0;">🎯 ${jobTitle}${company ? ' @ ' + company : ''}</h3>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 2rem; font-weight: bold; color: ${scoreColor};">${score}</div>
+                                <div style="color: ${scoreColor}; font-size: 0.9rem;">${scoreLabel}</div>
+                            </div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px;">
+                            <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${score}%; height: 100%; background: ${scoreColor}; border-radius: 4px; transition: width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 相关经验（如果有）
+                if (analysis.relevant_experience && analysis.relevant_experience.length > 0) {
+                    html += `
+                        <div class="form-group">
+                            <label style="color: #6bcf7f;">✅ 与职位相关的经验：</label>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                                ${analysis.relevant_experience.map(exp => `
+                                    <span style="background:rgba(107,207,127,0.2);padding:6px 14px;border-radius:12px;font-size:0.9rem;border:1px solid rgba(107,207,127,0.4);">${exp}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // 缺失技能（如果有）
+                if (analysis.missing_skills && analysis.missing_skills.length > 0) {
+                    html += `
+                        <div class="form-group">
+                            <label style="color: #ff9f43;">⚠️ 职位要求但简历中较少的技能：</label>
+                            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+                                ${analysis.missing_skills.map(skill => `
+                                    <span style="background:rgba(255,159,67,0.2);padding:6px 14px;border-radius:12px;font-size:0.9rem;border:1px solid rgba(255,159,67,0.4);">${skill}</span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // 职位申请技巧（如果有）
+                if (analysis.job_specific_tips && analysis.job_specific_tips.length > 0) {
+                    html += `<div class="form-group"><label style="color: #ffd93d;">💼 职位申请技巧：</label>`;
+                    analysis.job_specific_tips.forEach(tip => {
+                        html += `<div style="background:rgba(255,217,61,0.1);padding:10px 14px;border-radius:8px;margin-top:8px;border-left:3px solid #ffd93d;">${tip}</div>`;
+                    });
+                    html += '</div>';
+                }
+            }
+            
             // 技能标签
             if (analysis.skills && analysis.skills.length > 0) {
                 html += '<div class="form-group"><label>🔧 检测到的技能：</label><div style="display:flex;flex-wrap:wrap;gap:8px;">';
@@ -1464,6 +1733,18 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             // 工作经验
             if (analysis.experience_years > 0) {
                 html += `<div class="form-group"><label>📅 工作经验：</label><p>${analysis.experience_years}+ 年</p></div>`;
+            }
+            
+            // 优势
+            if (analysis.strengths && analysis.strengths.length > 0) {
+                html += `
+                    <div class="form-group">
+                        <label>💪 核心优势：</label>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                            ${analysis.strengths.map(s => `<span style="background:rgba(107,207,127,0.2);padding:4px 12px;border-radius:12px;font-size:0.85rem;">${s}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
             }
             
             // 改进建议
@@ -1500,6 +1781,11 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     <p style="color: #ccc; font-size: 0.85rem; margin-top: 8px;">
                         AI逐条分析，给出修改建议，您可以逐条选择接受或忽略
                     </p>
+                </div>
+                <div class="form-group" style="text-align: center;">
+                    <button class="btn btn-secondary" onclick="switchTab('templates')" style="font-size: 0.95rem; padding: 10px 24px;">
+                        📋 浏览所有简历模版
+                    </button>
                 </div>
             `;
             
@@ -2622,7 +2908,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         loadingDiv.classList.add('hidden');
                         progressFill.style.width = '0%';
                         
-                        // 修复：后端返回的是 translated_resume，去掉 AI 输出的 **** 占位符
+                        // 修复：后端返回的是 translated_resume，去掉 AI 输出的 *** / **** 等占位符
                         translatedResumeText = (data.translated_resume || data.translated_text || '').replace(/\*{2,}/g, '');
                         document.getElementById('translatedResume').value = translatedResumeText;
                         document.getElementById('translatedResult').classList.remove('hidden');
@@ -3418,115 +3704,6 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }
         }
         
-        // 职位搜索功能
-        async function searchJobs() {
-            const keyword = document.getElementById('jobSearchKeyword').value.trim();
-            const country = document.getElementById('jobSearchCountry').value;
-            
-            if (!keyword) {
-                document.getElementById('jobSearchError').textContent = '请输入搜索关键词';
-                document.getElementById('jobSearchError').classList.remove('hidden');
-                return;
-            }
-            
-            const loadingEl = document.getElementById('jobSearchLoading');
-            const resultsEl = document.getElementById('jobSearchResults');
-            const errorEl = document.getElementById('jobSearchError');
-            const countEl = document.getElementById('jobSearchCount');
-            const listEl = document.getElementById('jobSearchList');
-            
-            loadingEl.classList.remove('hidden');
-            resultsEl.classList.add('hidden');
-            errorEl.classList.add('hidden');
-            
-            try {
-                const response = await fetch(`/jobs/search?keyword=${encodeURIComponent(keyword)}&country=${country}&limit=15`);
-                const data = await response.json();
-                
-                loadingEl.classList.add('hidden');
-                
-                if (data.success && data.jobs && data.jobs.length > 0) {
-                    countEl.textContent = `找到 ${data.count} 个职位`;
-                    listEl.innerHTML = data.jobs.slice(0, 15).map(job => `
-                        <div style="background: rgba(0,0,0,0.3); border-radius: 10px; padding: 14px; margin-bottom: 10px; border: 1px solid rgba(0,212,255,0.2);">
-                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                                <div>
-                                    <div style="color: #fff; font-weight: 600; margin-bottom: 2px;">${job.title || '职位名称'}</div>
-                                    <div style="color: #00d4ff; font-size: 0.85rem;">${job.company || '公司'}</div>
-                                </div>
-                                <span style="font-size: 0.8rem; padding: 2px 8px; background: rgba(0,212,255,0.2); border-radius: 10px; white-space: nowrap;">${job.source || ''}</span>
-                            </div>
-                            <div style="color: #999; font-size: 0.8rem; margin-bottom: 10px;">
-                                📍 ${job.location || '未知地点'} · ${job.date || '日期未知'}
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-secondary" onclick="useSearchedJob(${JSON.stringify(job).replace(/'/g, "\\'").replace(/\"/g, "'")})" style="flex: 1; font-size: 0.85rem;">
-                                    ✨ 申请此职位
-                                </button>
-                                ${job.url ? `<a href="${job.url}" target="_blank" class="btn btn-secondary" style="font-size: 0.85rem; text-decoration: none;">🔗 查看原文</a>` : ''}
-                            </div>
-                        </div>
-                    `).join('');
-                    resultsEl.classList.remove('hidden');
-                } else {
-                    errorEl.textContent = `未找到 "${keyword}" 相关职位`;
-                    errorEl.classList.remove('hidden');
-                }
-            } catch (e) {
-                loadingEl.classList.add('hidden');
-                errorEl.textContent = '搜索失败，请稍后重试';
-                errorEl.classList.remove('hidden');
-                console.error('Job search error:', e);
-            }
-        }
-        
-        // 使用搜索到的职位
-        function useSearchedJob(job) {
-            if (!job) return;
-            
-            // 保存到全局变量
-            window.currentTargetJob = {
-                title: job.title || '职位名称',
-                company: job.company || '公司名称',
-                description: job.description || '',
-                source: job.source || '搜索',
-                url: job.url || ''
-            };
-            
-            // 同步到输入框
-            document.getElementById('searchJobTitle').value = job.title || '';
-            document.getElementById('searchCompany').value = job.company || '';
-            document.getElementById('searchJobDesc').value = job.description || '';
-            
-            // 添加到 savedJobs
-            const lang = detectLanguageLocal(job.description || '');
-            const jobObj = {
-                id: Date.now(),
-                title: job.title || '职位名称',
-                company: job.company || '公司名称',
-                description: job.description || '',
-                language: lang,
-                source: job.source || '搜索',
-                url: job.url || '',
-                savedAt: new Date().toLocaleString()
-            };
-            savedJobs.push(jobObj);
-            updateJobSelect();
-            
-            // 提示用户
-            showToast(`✅ 已选择「${job.title}」，可以生成求职信了！`);
-            
-            // 滚动到页面顶部
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-        
-        // 清除搜索结果
-        function clearJobSearch() {
-            document.getElementById('jobSearchKeyword').value = '';
-            document.getElementById('jobSearchResults').classList.add('hidden');
-            document.getElementById('jobSearchError').classList.add('hidden');
-        }
-        
         // 显示手动输入区
         function showManualInput() {
             const pasteDiv = document.getElementById('pasteTextInput');
@@ -4161,6 +4338,12 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const data = await res.json();
                 if (data.success) {
                     renderMatchResult(data.match, jobData);
+                    // 🎯 自动加载缺失技能的定制学习推荐
+                    if (data.match && data.match.missing_skills && data.match.missing_skills.length > 0) {
+                        fetchLearningRecommendations(data.match.missing_skills, jobData.title || '');
+                    } else {
+                        hideLearningSection();
+                    }
                     showToast('✅ 匹配分析完成！');
                 } else { showToast('❌ 匹配失败: ' + data.error); }
             } catch (e) { showToast('❌ 网络错误'); }
@@ -4220,6 +4403,114 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
             content.innerHTML = html;
             card.classList.remove('hidden');
+        }
+
+        // ===== 🎓 智能学习推荐 =====
+        async function fetchLearningRecommendations(missingSkills, jobTitle) {
+            const card = document.getElementById('extractResultCard');
+            let section = document.getElementById('learningRecSection');
+
+            showToast('📚 正在为您匹配学习资源...');
+            try {
+                const res = await fetch('/learning/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ missing_skills: missingSkills, job_title: jobTitle })
+                });
+                const data = await res.json();
+                if (data.success && data.recommendations && data.recommendations.length > 0) {
+                    renderLearningRecommendations(data, card);
+                }
+            } catch (e) {
+                console.log('学习推荐暂时不可用', e);
+            }
+        }
+
+        function renderLearningRecommendations(data, card) {
+            // 如果还没有推荐区块，先插入
+            let section = document.getElementById('learningRecSection');
+            if (!section) {
+                // 在结果卡片后面插入推荐区块
+                const insertAfter = document.getElementById('extractResultContent');
+                section = document.createElement('div');
+                section.id = 'learningRecSection';
+                insertAfter.parentNode.insertBefore(section, insertAfter.nextSibling);
+            }
+
+            const recs = data.recommendations || [];
+            let html = `
+                <div style="margin-top:24px;padding:20px;background:linear-gradient(135deg,rgba(107,207,127,0.08),rgba(0,212,255,0.08));border:1px solid rgba(0,212,255,0.2);border-radius:12px;">
+                    <h3 style="color:#00d4ff;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+                        🎓 针对您缺口的定制学习方案
+                        <span style="background:rgba(0,212,255,0.2);color:#00d4ff;font-size:0.75rem;padding:2px 10px;border-radius:20px;font-weight:normal;">
+                            ${recs.length} 个技能
+                        </span>
+                    </h3>
+                    <p style="color:#aaa;font-size:0.85rem;margin-bottom:16px;">${data.ai_summary || ''}</p>
+            `;
+
+            recs.forEach((rec, idx) => {
+                const skillName = rec.skill;
+                const category = rec.category || '通用';
+                const categoryColors = {
+                    'ERP': '#8b5cf6', '财务': '#10b981', '项目管理': '#f59e0b',
+                    '数据分析': '#3b82f6', '技术': '#06b6d4', '供应链': '#84cc16',
+                    '软技能': '#ec4899', '工具': '#64748b', '求职': '#f97316',
+                    '语言': '#a855f7', '业务': '#14b8a6', '合规': '#6366f1',
+                };
+                const badgeColor = categoryColors[category] || '#6366f1';
+
+                // 免费资源
+                const freeHtml = rec.free && rec.free.length > 0
+                    ? rec.free.slice(0, 2).map(r => `
+                        <a href="${r.url}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;text-decoration:none;color:#fff;transition:all 0.2s;margin-bottom:6px;" onmouseover="this.style.borderColor='rgba(16,185,129,0.6)'" onmouseout="this.style.borderColor='rgba(16,185,129,0.3)'">
+                            <span style="font-size:1rem;">📖</span>
+                            <div>
+                                <div style="font-weight:600;font-size:0.85rem;">${r.title}</div>
+                                <div style="color:#aaa;font-size:0.75rem;">${r.desc}</div>
+                            </div>
+                        </a>`).join('')
+                    : '<p style="color:#666;font-size:0.8rem;text-align:center;">暂无免费资源</p>';
+
+                // 付费资源
+                const paidHtml = rec.paid && rec.paid.length > 0
+                    ? rec.paid.slice(0, 2).map(r => `
+                        <a href="${r.url}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,152,0,0.08);border:1px solid rgba(255,152,0,0.25);border-radius:8px;text-decoration:none;color:#fff;transition:all 0.2s;margin-bottom:6px;" onmouseover="this.style.borderColor='rgba(255,152,0,0.5)'" onmouseout="this.style.borderColor='rgba(255,152,0,0.25)'">
+                            <span style="font-size:1rem;">🚀</span>
+                            <div>
+                                <div style="font-weight:600;font-size:0.85rem;">${r.title}</div>
+                                <div style="color:#aaa;font-size:0.75rem;">${r.desc}${r.price_hint ? ' · ' + r.price_hint : ''}</div>
+                            </div>
+                        </a>`).join('')
+                    : '';
+
+                html += `
+                    <div style="margin-bottom:20px;padding:14px;background:rgba(0,0,0,0.2);border-radius:10px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <span style="background:${badgeColor};color:#fff;font-size:0.8rem;font-weight:bold;padding:2px 10px;border-radius:12px;">${skillName}</span>
+                            <span style="color:#888;font-size:0.75rem;">${category}</span>
+                        </div>
+                        <div style="margin-bottom:8px;">
+                            <div style="color:#6bcf7f;font-size:0.8rem;font-weight:600;margin-bottom:6px;">🆓 免费资源</div>
+                            ${freeHtml}
+                        </div>
+                        ${paidHtml ? `
+                        <div>
+                            <div style="color:#ff9800;font-size:0.8rem;font-weight:600;margin-bottom:6px;">💎 付费推荐</div>
+                            ${paidHtml}
+                        </div>` : ''}
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            section.innerHTML = html;
+            section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function hideLearningSection() {
+            const section = document.getElementById('learningRecSection');
+            if (section) section.remove();
         }
 
         async function batchMatchJobs() {
@@ -4529,6 +4820,82 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             if (tab === 'tracker') { initTrackerTab(); }
             if (tab === 'payment') { initPaymentTab(); }
         }
+
+        // ===== 模版预览功能 =====
+        function showTemplatePreview(type) {
+            const modal = document.getElementById('templatePreviewModal');
+            const content = document.getElementById('modalTemplateContent');
+            const title = document.getElementById('modalTemplateTitle');
+            
+            const templates = {
+                'classic': { title: '经典专业型', subtitle: 'Professional Classic', desc: '适合金融/咨询行业' },
+                'modern': { title: '现代简约型', subtitle: 'Modern Minimal', desc: '适合IT/科技行业' },
+                'creative': { title: '创意活力型', subtitle: 'Creative Bold', desc: '适合创意/营销行业' }
+            };
+
+            // 显示完整预览（无会员限制，Thor专属权限 👑）
+            title.innerHTML = '<span style="color:#00d4ff;">' + templates[type].title + '</span><span style="color:#666;font-size:0.8rem;font-weight:normal;"> · ' + templates[type].subtitle + '</span>';
+            content.innerHTML = '<div style="text-align:center;padding:40px;"><div style="background:#fff;border-radius:12px;padding:32px;box-shadow:0 8px 32px rgba(0,0,0,0.3);max-width:600px;margin:0 auto;"><p style="color:#00d4ff;font-weight:600;font-size:1.1rem;margin-bottom:4px;">' + templates[type].title + '</p><p style="color:#888;font-size:0.85rem;margin-bottom:16px;">' + templates[type].subtitle + ' · ' + templates[type].desc + '</p><div style="text-align:left;padding:16px;background:#f8f9fa;border-radius:8px;"><p style="color:#333;font-size:0.85rem;">完整的模版预览包含：</p><ul style="color:#555;font-size:0.85rem;text-align:left;margin:8px 0 0 20px;"><li>完整简历版式设计</li><li>各模块布局预览</li><li>配色方案展示</li><li>一键导出功能</li></ul></div></div></div>';
+            modal.style.display = 'flex';
+        }
+        
+        function closeTemplatePreview() {
+            document.getElementById('templatePreviewModal').style.display = 'none';
+        }
+
+        // ===== 意见反馈功能 =====
+        function openFeedbackModal() {
+            document.getElementById('feedbackModal').style.display = 'flex';
+        }
+        
+        function closeFeedbackModal() {
+            document.getElementById('feedbackModal').style.display = 'none';
+            document.getElementById('feedbackResult').textContent = '';
+        }
+        
+        async function submitFeedback() {
+            const email = document.getElementById('feedbackEmail').value;
+            const type = document.getElementById('feedbackType').value;
+            const content = document.getElementById('feedbackContent').value;
+            const result = document.getElementById('feedbackResult');
+            
+            if (!content.trim()) {
+                result.textContent = '❌ 请填写反馈内容';
+                result.style.color = '#ff6b6b';
+                return;
+            }
+            
+            result.textContent = '⏳ 提交中...';
+            result.style.color = '#ffd700';
+            
+            try {
+                const userId = getSessionUserId();
+                const response = await fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, email, type, content })
+                });
+                
+                if (response.ok) {
+                    result.textContent = '✅ 感谢您的反馈！';
+                    result.style.color = '#6bcf7f';
+                    setTimeout(closeFeedbackModal, 2000);
+                } else {
+                    throw new Error('提交失败');
+                }
+            } catch (e) {
+                result.textContent = '❌ 提交失败，请稍后重试';
+                result.style.color = '#ff6b6b';
+            }
+        }
+
+        // 点击弹窗外部关闭
+        document.getElementById('templatePreviewModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeTemplatePreview();
+        });
+        document.getElementById('feedbackModal')?.addEventListener('click', function(e) {
+            if (e.target === this) closeFeedbackModal();
+        });
         
         // 自动填充当前职位信息到求职信Tab
         function autoFillCurrentJob() {
@@ -5094,5 +5461,61 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             </button>
         </div>
     </div>
+
+    <!-- 模版预览弹窗 -->
+    <div id="templatePreviewModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:3000;align-items:center;justify-content:center;">
+        <div style="background:#1e3a5f;border-radius:16px;padding:24px;max-width:90%;max-height:90%;overflow:auto;border:1px solid rgba(255,255,255,0.2);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 id="modalTemplateTitle" style="color:#00d4ff;margin:0;">简历模版预览</h3>
+                <button onclick="closeTemplatePreview()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.5rem;cursor:pointer;padding:8px 16px;border-radius:8px;">✕</button>
+            </div>
+            <div id="modalTemplateContent" style="background:#fff;border-radius:8px;padding:40px;max-width:800px;margin:0 auto;color:#333;box-shadow:0 10px 40px rgba(0,0,0,0.5);">
+                <!-- 模版内容将动态填充 -->
+            </div>
+            <div style="margin-top:20px;text-align:center;">
+                <p style="color:#ccc;font-size:0.9rem;margin-bottom:12px;">
+                    完整模版文件将在您升级会员后提供下载
+                </p>
+                <button onclick="closeTemplatePreview();switchTab('payment');" class="btn btn-primary" style="font-size:1rem;">
+                    ⭐ 升级会员获取模版
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 意见反馈弹窗 -->
+    <div id="feedbackModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:3000;align-items:center;justify-content:center;">
+        <div style="background:#1e3a5f;border-radius:16px;padding:24px;max-width:500px;width:90%;border:1px solid rgba(255,255,255,0.2);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                <h3 style="color:#00d4ff;margin:0;">💬 意见反馈</h3>
+                <button onclick="closeFeedbackModal()" style="background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.5rem;cursor:pointer;padding:8px 16px;border-radius:8px;">✕</button>
+            </div>
+            <div class="form-group">
+                <label>您的邮箱（方便我们回复您，可选）</label>
+                <input type="email" id="feedbackEmail" placeholder="your@email.com" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:12px;border-radius:8px;width:100%;">
+            </div>
+            <div class="form-group">
+                <label>反馈类型</label>
+                <select id="feedbackType" style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:12px;border-radius:8px;width:100%;">
+                    <option value="suggestion">💡 功能建议</option>
+                    <option value="bug">🐛 Bug报告</option>
+                    <option value="other">📝 其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>详细描述</label>
+                <textarea id="feedbackContent" placeholder="请详细描述您的问题或建议..." style="background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:12px;border-radius:8px;width:100%;min-height:120px;resize:vertical;"></textarea>
+            </div>
+            <button onclick="submitFeedback()" class="btn btn-primary" style="width:100%;padding:14px;font-size:1rem;">
+                提交反馈
+            </button>
+            <div id="feedbackResult" style="margin-top:12px;text-align:center;font-size:0.9rem;"></div>
+        </div>
+    </div>
+
+    <!-- 底部反馈按钮 -->
+    <button onclick="openFeedbackModal()" style="position:fixed;bottom:20px;right:20px;background:linear-gradient(135deg,#00d4ff,#0099cc);border:none;color:#fff;padding:12px 20px;border-radius:50px;font-size:0.9rem;cursor:pointer;box-shadow:0 4px 20px rgba(0,212,255,0.4);z-index:1000;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+        💬 反馈
+    </button>
 </body>
 </html>
