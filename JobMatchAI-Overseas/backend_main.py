@@ -976,14 +976,7 @@ app = FastAPI(title="JobMatchAI Nordic API", version="2.0.0")
 # CORS配置 - 明确允许的域名（allow_credentials=True时不能用*）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://job-match-ai.com",
-        "https://www.job-match-ai.com",
-        "https://jobmatchai-37ld.onrender.com",
-        "http://localhost:8000",
-        "http://localhost:3000",
-        "http://localhost:8080",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
