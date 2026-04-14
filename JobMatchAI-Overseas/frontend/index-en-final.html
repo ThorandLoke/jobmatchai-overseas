@@ -25,6 +25,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         // API calls go through backend at api.job-match-ai.com
         const API_KEY = ''; // Not used when USE_FRONTEND_AI = false
         const USE_FRONTEND_AI = false; // Use backend API for AI calls
+        const API_BASE = 'https://jobmatchai-overseas.onrender.com';
     </script>
     
     <style>
@@ -1517,7 +1518,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const formData = new FormData();
             formData.append('file', file);
             
-            fetch('/upload-resume', {
+            fetch(API_BASE + '/upload-resume', {
                 method: 'POST',
                 body: formData
             })
@@ -1543,32 +1544,29 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         
         // PositionSearch
         async function searchJobs() {
-            const keyword = document.getElementById('searchKeyword').value || 'Consultant';
-            const city = document.getElementById('searchCity').value || '';
-            const country = document.getElementById('searchCountry').value;
+            const keyword = document.getElementById('jobSearchKeyword').value.trim();
+            const country = document.getElementById('jobSearchCountry').value;
             
-            showToast('🔍 CurrentlySearch Jobs...');
+            if (!keyword) {
+                showToast('⚠️ Please enter a search keyword');
+                return;
+            }
+            
+            showToast('🔍 Searching Jobs...');
             
             try {
-                const params = new URLSearchParams({
-                    keyword: keyword,
-                    country: country,
-                    location: city,  // City作for location 参数
-                    limit: 15
-                });
-                
-                const res = await fetch(`/jobs/search?${params}`);
+                const res = await fetch(API_BASE + `/jobs/search?keyword=${encodeURIComponent(keyword)}&country=${country}&limit=15`);
                 const data = await res.json();
                 
-                if (data.success && data.jobs.length > 0) {
+                if (data.success && data.jobs && data.jobs.length > 0) {
                     displaySearchResults(data.jobs);
-                    showToast(`✅ Findto ${data.count} Position`);
-                } else if (data.success && data.jobs.length === 0) {
+                    showToast(`✅ Found ${data.count} Positions`);
+                } else if (data.success && (!data.jobs || data.jobs.length === 0)) {
                     document.getElementById('searchResults').style.display = 'block';
-                    document.getElementById('searchResultsList').innerHTML = '<p style="color: #ccc;">NoneMatchPosition，试试itsheKeywords？</p>';
-                    showToast('🔍 没FindtoMatchPosition');
+                    document.getElementById('searchResultsList').innerHTML = '<p style="color: #ccc;">No matching positions found. Try different keywords?</p>';
+                    showToast('🔍 No matching positions found');
                 } else {
-                    showToast('❌ SearchFailed: ' + (data.error || 'UnknownError'));
+                    showToast('❌ Search failed: ' + (data.error || 'Unknown error'));
                 }
             } catch (err) {
                 console.error('SearchError:', err);
@@ -1661,7 +1659,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('resume_text', text);
                 formData.append('language', 'auto');
                 
-                const res = await fetch('/analyze-resume', {
+                const res = await fetch(API_BASE + '/analyze-resume', {
                     method: 'POST',
                     body: formData
                 });
@@ -1967,7 +1965,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const userId = getSessionUserId();
                 loadingText.textContent = '⏳ Currently连接服务器...';
                 
-                const res = await fetch('/api/resume/polish', {
+                const res = await fetch(API_BASE + '/api/resume/polish', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -2112,7 +2110,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
             // CallAPIApp接受修改
             try {
-                const res = await fetch('/api/resume/apply-polish', {
+                const res = await fetch(API_BASE + '/api/resume/apply-polish', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -2939,7 +2937,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 500);
             
             try {
-                const res = await fetch('/api/resume/translate', {
+                const res = await fetch(API_BASE + '/api/resume/translate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -3298,7 +3296,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const res = await fetch('/upload-document', {
+                const res = await fetch(API_BASE + '/upload-document', {
                     method: 'POST',
                     body: formData
                 });
@@ -3307,7 +3305,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 if (data.success) {
                     // CallAIExtractPositionInfo
-                    const extractRes = await fetch('/api/resume/extract-job-from-text', {
+                    const extractRes = await fetch(API_BASE + '/api/resume/extract-job-from-text', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -3511,7 +3509,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const res = await fetch('/upload-job-document', {
+                const res = await fetch(API_BASE + '/upload-job-document', {
                     method: 'POST',
                     body: formData
                 });
@@ -3625,7 +3623,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('job_url', url);
                 
-                const res = await fetch('/fetch-job-from-url', {
+                const res = await fetch(API_BASE + '/fetch-job-from-url', {
                     method: 'POST',
                     body: formData
                 });
@@ -4029,7 +4027,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('job_description', job.description);
                 formData.append('language', lang);
                 
-                const res = await fetch('/generate-cover-letter', {
+                const res = await fetch(API_BASE + '/generate-cover-letter', {
                     method: 'POST',
                     body: formData
                 });
@@ -4095,7 +4093,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 profileForm.append('user_id', userId);
                 profileForm.append('resume_text', currentResume);
                 
-                const profileRes = await fetch('/user-profile/create', {
+                const profileRes = await fetch(API_BASE + '/user-profile/create', {
                     method: 'POST',
                     body: profileForm
                 });
@@ -4117,7 +4115,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 showToast('📧 Currently读取邮件and智CanFilter...');
                 
-                const processRes = await fetch('/jobs/process-email-batch', {
+                const processRes = await fetch(API_BASE + '/jobs/process-email-batch', {
                     method: 'POST',
                     body: processForm
                 });
@@ -4295,7 +4293,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             try {
                 const formData = new FormData();
                 formData.append('resume_text', text);
-                const res = await fetch('/extract/resume', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/resume', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderExtractProfile(data.profile);
@@ -4386,7 +4384,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('resume_text', text);
                 formData.append('job', JSON.stringify(jobData));
-                const res = await fetch('/extract/match', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/match', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderMatchResult(data.match, jobData);
@@ -4462,7 +4460,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('resume_text', text);
                 formData.append('jobs', JSON.stringify(savedJobs));
                 formData.append('min_score', '30');
-                const res = await fetch('/extract/batch-match', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/batch-match', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderBatchMatchResults(data.ranked_jobs);
@@ -4525,7 +4523,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     priority: priority,
                     notes: notes
                 }));
-                const res = await fetch('/tracker/add', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/add', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast('✅ ApplyRecordDoneAdd！');
@@ -4621,7 +4619,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('user_id', userId);
                 formData.append('application_id', appId);
                 formData.append('new_status', newStatus);
-                const res = await fetch('/tracker/update-status', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/update-status', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast(`✅ StatusDoneUpdatefor：${statusMap(newStatus)}`);
@@ -4638,7 +4636,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('user_id', userId);
                 formData.append('application_id', appId);
                 formData.append('new_status', newStatus);
-                const res = await fetch('/tracker/update-status', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/update-status', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast(`✅ DoneUpdatefor：${statusMap(newStatus)}`);
@@ -4651,7 +4649,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         async function loadTrackerStats() {
             const userId = getSessionUserId();
             try {
-                const res = await fetch(`/tracker/stats/${userId}`);
+                const res = await fetch(API_BASE + `/tracker/stats/${userId}`);
                 const data = await res.json();
                 if (data.success) {
                     renderTrackerStats(data.stats);
@@ -4703,7 +4701,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         };
         
         function updateCityDropdown() {
-            const country = document.getElementById('searchCountry').value;
+            const country = document.getElementById('jobSearchCountry').value;
             const citySelect = document.getElementById('searchCity');
             
             if (!country || country === 'all') {
@@ -4844,28 +4842,29 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const userId = getSessionUserId();
             try {
                 const [plansRes, subRes] = await Promise.all([
-                    fetch('/payment/plans'),
+                    fetch(API_BASE + '/payment/plans'),
                     fetch(`/payment/subscription/${userId}`)
                 ]);
                 const plansData = await plansRes.json();
                 const subData = await subRes.json();
-                if (plansData.success) renderPricingPlans(plansData.plans);
+                if (plansData.success) renderPricingPlans(plansData.plans, plansData.currency);
                 if (subData.success) renderSubscriptionStatus(subData.subscription);
             } catch (e) { console.error(e); }
         }
 
-        function renderPricingPlans(plans) {
+        function renderPricingPlans(plans, currency = 'dkk') {
             const container = document.getElementById('pricingPlans');
             const userId = getSessionUserId();
             const colors = ['#00d4ff', '#a29bfe', '#fd79a8'];
-            const badges = ['', 'most划算 ⭐', 'most受欢迎 🔥'];
+            const badges = ['', 'Best Value ⭐', 'Most Popular 🔥'];
+            const currencySymbol = currency === 'cny' ? '¥' : 'DKK ';
 
             container.innerHTML = plans.map((plan, i) => `
                 <div style="background:rgba(0,0,0,0.3);border-radius:16px;padding:24px;text-align:center;border:2px solid ${plan.id === 'yearly' ? '#6bcf7f' : 'transparent'};${plan.id === 'yearly' ? 'box-shadow:0 0 20px rgba(107,207,127,0.2);' : ''}">
                     ${badges[i] ? `<span style="background:${colors[i]};color:#000;padding:2px 10px;border-radius:10px;font-size:0.75rem;">${badges[i]}</span>` : ''}
                     <h3 style="color:${colors[i]};margin:12px 0;">${plan.name}</h3>
                     <div style="font-size:2rem;font-weight:bold;margin:8px 0;">
-                        ${plan.price}<span style="font-size:1rem;color:#ccc;"> ¥</span>
+                        ${currencySymbol}${plan.price}
                     </div>
                     <div style="color:#ccc;font-size:0.8rem;">/${plan.interval}</div>
                     ${plan.tagline ? `<div style="color:#ffc107;font-size:0.85rem;margin:8px 0;">${plan.tagline}</div>` : ''}
@@ -4874,7 +4873,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         ${(plan.features || []).map(f => `<li>${f}</li>`).join('')}
                     </ul>
                     <button class="btn ${plan.id === 'yearly' ? 'btn-primary' : 'btn-secondary'}" onclick="subscribePlan('${plan.id}')" style="width:100%;">
-                        Subscribe ${plan.name}
+                        Subscribe Now
                     </button>
                 </div>
             `).join('');
@@ -4916,13 +4915,13 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('plan_id', planId);
                 formData.append('user_id', userId);
-                const res = await fetch('/payment/create-checkout', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/payment/create-checkout', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     if (data.demo_mode) {
                         // Demo模式：Direct激活
                         showToast('⚠️ Demo模式：Direct激活Subscribe（需配置真实Stripe Key）');
-                        const activateRes = await fetch('/payment/activate-demo', {
+                        const activateRes = await fetch(API_BASE + '/payment/activate-demo', {
                             method: 'POST',
                             body: new URLSearchParams({ plan_id: planId, user_id: userId })
                         });
@@ -4944,7 +4943,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             if (!confirm('确定要CancelSubscribe？Cancel后you仍Usetoto期日。')) return;
             const userId = getSessionUserId();
             try {
-                const res = await fetch('/payment/cancel', {
+                const res = await fetch(API_BASE + '/payment/cancel', {
                     method: 'POST',
                     body: new URLSearchParams({ user_id: userId })
                 });
@@ -4983,7 +4982,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('company', company);
                 formData.append('job_description', jobDesc);
                 formData.append('resume_text', currentResume || '');
-                const res = await fetch('/cover-letter/check', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/cover-letter/check', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderCoverLetterQuality(data);
@@ -5165,7 +5164,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 if (currentResume) {
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5175,7 +5174,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         })
                     );
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5194,7 +5193,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         url: ''
                     });
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5215,7 +5214,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('password', password || '');
                 formData.append('interested_position', interestedPosition);
                 
-                const response = await fetch('/session/register', {
+                const response = await fetch(API_BASE + '/session/register', {
                     method: 'POST',
                     body: formData
                 });
@@ -5331,7 +5330,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         // Check if backend API is available
         (async function checkBackend() {
             try {
-                const res = await fetch('/api/health', {method:'GET', cache:'no-cache'});
+                const res = await fetch(API_BASE + '/api/health', {method:'GET', cache:'no-cache'});
                 if (!res.ok) throw new Error('Backend not available');
             } catch (e) {
                 document.getElementById('apiStatusHint').style.display = 'block';
@@ -5361,7 +5360,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             errorEl.classList.add('hidden');
             
             try {
-                const response = await fetch(`/jobs/search?keyword=${encodeURIComponent(keyword)}&country=${country}&limit=15`);
+                const response = await fetch(API_BASE + `/jobs/search?keyword=${encodeURIComponent(keyword)}&country=${country}&limit=15`);
                 const data = await response.json();
                 
                 loadingEl.classList.add('hidden');

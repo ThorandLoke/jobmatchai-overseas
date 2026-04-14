@@ -418,7 +418,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             </div>
             <div class="prop-card" style="padding: 16px;">
                 <div class="prop-icon" style="font-size: 1.2rem;">🎯</div>
-                <h3 style="font-size: 0.95rem;">评估申请成功率</h3>
+                <h3 style="font-size: 0.95rem;">职位匹配度评估</h3>
                 <p style="font-size: 0.85rem;">智能分析简历与职位的匹配度，为您的申请策略提供参考建议</p>
             </div>
         </div>
@@ -4600,7 +4600,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 jobTitle = savedJobs[jobIndex].title;
                 company = savedJobs[jobIndex].company;
             }
-            showToast('🔍 正在评估申请成功率...');
+            showToast('🔍 正在评估匹配度...');
             try {
                 const formData = new FormData();
                 formData.append('cover_letter', coverLetter);
@@ -4686,16 +4686,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 100);
         }
 
-        // 在求职信页面添加质量检测按钮
-        const coverTabContent = document.querySelector('#coverTab .card');
-        if (coverTabContent) {
-            const qualityBtn = document.createElement('button');
-            qualityBtn.className = 'btn btn-secondary';
-            qualityBtn.style.cssText = 'margin-top: 10px; width: 100%;';
-            qualityBtn.textContent = '🎯 评估申请成功率';
-            qualityBtn.onclick = checkCoverLetterQuality;
-            coverTabContent.appendChild(qualityBtn);
-        }
+
 
         // Toast提示
         function showToast(message) {
