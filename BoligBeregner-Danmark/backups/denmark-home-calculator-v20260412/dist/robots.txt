@@ -1,0 +1,16 @@
+# BoligBeregner Danmark - Robots.txt
+# https://denmark-home-calculator-mikr30lsh-thorandlokes-projects.vercel.app
+
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://denmark-home-calculator-mikr30lsh-thorandlokes-projects.vercel.app/sitemap.xml
+
+# Crawl-delay (optional, be nice to smaller crawlers)
+Crawl-delay: 1
+
+# Block common non-content paths (if any)
+Disallow: /api/
+Disallow: /_next/
+Disallow: /dist/

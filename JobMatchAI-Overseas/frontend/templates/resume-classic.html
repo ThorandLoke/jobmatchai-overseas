@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简历 - Professional Classic</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .resume {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        /* Header - 深蓝色经典风格 */
+        .header {
+            background: linear-gradient(135deg, #1a365d 0%, #2c5282 100%);
+            color: #fff;
+            padding: 40px 50px;
+            position: relative;
+        }
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50px;
+            right: 50px;
+            height: 3px;
+            background: #c9a227;
+        }
+        .name {
+            font-family: 'Playfair Display', serif;
+            font-size: 28pt;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+        }
+        .title {
+            font-size: 14pt;
+            color: #bee3f8;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        .contact-info {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 10pt;
+            color: #e2e8f0;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .contact-item svg {
+            width: 14px;
+            height: 14px;
+            fill: #c9a227;
+        }
+        
+        /* Section */
+        .section {
+            padding: 25px 50px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .section:last-child { border-bottom: none; }
+        
+        .section-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 14pt;
+            font-weight: 600;
+            color: #1a365d;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #c9a227;
+            display: inline-block;
+        }
+        
+        /* Summary */
+        .summary {
+            color: #4a5568;
+            text-align: justify;
+        }
+        
+        /* Experience */
+        .experience-item {
+            margin-bottom: 20px;
+        }
+        .experience-item:last-child { margin-bottom: 0; }
+        
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 5px;
+        }
+        .job-title {
+            font-weight: 700;
+            font-size: 12pt;
+            color: #2c5282;
+        }
+        .company {
+            font-size: 11pt;
+            color: #4a5568;
+            margin-bottom: 3px;
+        }
+        .date {
+            font-size: 10pt;
+            color: #718096;
+            font-style: italic;
+        }
+        .job-description {
+            color: #4a5568;
+            padding-left: 15px;
+            border-left: 2px solid #bee3f8;
+        }
+        .job-description li {
+            margin-bottom: 5px;
+        }
+        
+        /* Skills */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .skill-category {
+            margin-bottom: 10px;
+        }
+        .skill-category-title {
+            font-weight: 600;
+            color: #2c5282;
+            margin-bottom: 5px;
+            font-size: 10pt;
+        }
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .skill-tag {
+            background: #ebf8ff;
+            color: #2c5282;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-size: 9pt;
+        }
+        
+        /* Education */
+        .education-item {
+            margin-bottom: 15px;
+        }
+        .education-item:last-child { margin-bottom: 0; }
+        .degree {
+            font-weight: 700;
+            color: #2c5282;
+        }
+        .school {
+            color: #4a5568;
+        }
+        
+        /* Print */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .resume { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="resume">
+        <!-- Header -->
+        <div class="header">
+            <div class="name">{{NAME}}</div>
+            <div class="title">{{TITLE}}</div>
+            <div class="contact-info">
+                <span class="contact-item">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    {{EMAIL}}
+                </span>
+                <span class="contact-item">
+                    <svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                    {{PHONE}}
+                </span>
+                <span class="contact-item">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    {{LOCATION}}
+                </span>
+                {{#LINKEDIN}}
+                <span class="contact-item">
+                    <svg viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
+                    {{LINKEDIN}}
+                </span>
+                {{/LINKEDIN}}
+            </div>
+        </div>
+        
+        <!-- Summary -->
+        {{#SUMMARY}}
+        <div class="section">
+            <div class="section-title">个人简介 | Professional Summary</div>
+            <p class="summary">{{SUMMARY}}</p>
+        </div>
+        {{/SUMMARY}}
+        
+        <!-- Experience -->
+        <div class="section">
+            <div class="section-title">工作经验 | Professional Experience</div>
+            {{#EXPERIENCE}}
+            <div class="experience-item">
+                <div class="job-header">
+                    <span class="job-title">{{JOB_TITLE}}</span>
+                    <span class="date">{{DATE_RANGE}}</span>
+                </div>
+                <div class="company">{{COMPANY}}{{#LOCATION}} · {{LOCATION}}{{/LOCATION}}</div>
+                <ul class="job-description">
+                    {{#DESCRIPTION}}
+                    <li>{{.}}</li>
+                    {{/DESCRIPTION}}
+                </ul>
+            </div>
+            {{/EXPERIENCE}}
+        </div>
+        
+        <!-- Skills -->
+        <div class="section">
+            <div class="section-title">专业技能 | Skills</div>
+            <div class="skills-grid">
+                {{#SKILLS}}
+                <div class="skill-category">
+                    <div class="skill-category-title">{{CATEGORY}}</div>
+                    <div class="skill-tags">
+                        {{#ITEMS}}<span class="skill-tag">{{.}}</span>{{/ITEMS}}
+                    </div>
+                </div>
+                {{/SKILLS}}
+            </div>
+        </div>
+        
+        <!-- Education -->
+        {{#EDUCATION}}
+        <div class="section">
+            <div class="section-title">教育背景 | Education</div>
+            {{#EDUCATION}}
+            <div class="education-item">
+                <span class="degree">{{DEGREE}}</span> · <span class="school">{{SCHOOL}}</span>
+                <br><span class="date">{{DATE_RANGE}}</span>
+                {{#GPA}}<br>GPA: {{GPA}}{{/GPA}}
+            </div>
+            {{/EDUCATION}}
+        </div>
+        {{/EDUCATION}}
+        
+        <!-- Languages -->
+        {{#LANGUAGES}}
+        <div class="section">
+            <div class="section-title">语言能力 | Languages</div>
+            <div class="skill-tags">
+                {{#LANGUAGES}}<span class="skill-tag">{{.}}</span>{{/LANGUAGES}}
+            </div>
+        </div>
+        {{/LANGUAGES}}
+        
+        <!-- Certifications -->
+        {{#CERTIFICATIONS}}
+        <div class="section">
+            <div class="section-title">专业认证 | Certifications</div>
+            <ul class="job-description">
+                {{#CERTIFICATIONS}}<li>{{.}}</li>{{/CERTIFICATIONS}}
+            </ul>
+        </div>
+        {{/CERTIFICATIONS}}
+    </div>
+</body>
+</html>

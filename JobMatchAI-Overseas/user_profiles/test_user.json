@@ -1,0 +1,37 @@
+{
+  "user_id": "test_user",
+  "created_at": "2026-04-12T13:20:40.275907",
+  "updated_at": "2026-04-12T13:20:40.279368",
+  "skills": {},
+  "total_years": 0,
+  "industries": [],
+  "roles": [],
+  "preferred_locations": [],
+  "preferred_languages": [],
+  "min_salary": null,
+  "max_salary": null,
+  "viewed_jobs": [],
+  "saved_jobs": [],
+  "applied_jobs": [],
+  "ignored_jobs": [],
+  "positive_keywords": [],
+  "negative_keywords": [],
+  "resume_history": [
+    {
+      "version": 1,
+      "timestamp": "2026-04-12T13:20:40.279362",
+      "resume_text": "负责ERP系统实施，使用Dynamics 365",
+      "polish_summary": "优化了动词表达",
+      "job_context": "D365顾问",
+      "match_score": 75.0,
+      "skill_gaps": [
+        "Power BI"
+      ]
+    }
+  ],
+  "skill_gap_history": [],
+  "application_history": [],
+  "learning_history": [],
+  "target_job_types": [],
+  "last_analysis_at": "2026-04-12T13:20:40.279367"
+}

@@ -1,0 +1,11 @@
+[
+  {
+    "id": "msg-1775980856696-03rcyt",
+    "from": "team-lead",
+    "to": "boligberegner-pm",
+    "type": "message",
+    "content": "你好！Thor 已经为你创建了专属的 BoligBeregner 产品管理工作区。\n\n现在我把所有关键上下文传给你，方便你直接和 Thor 沟通产品迭代任务。\n\n---\n\n## 📦 项目基本信息\n\n**项目位置**: `/Users/weili/WorkBuddy/Claw/BoligBeregner-Danmark/`\n\n**主要模块**:\n- `denmark-home-buyer/` - Next.js 主应用（丹麦购房计算器）\n- `denmark-home-calculator/` - 独立计算器模块\n- `social-media/` - 社媒推广工具\n\n**部署**: Vercel + Cloudflare\n**用户画像**: 丹麦华人 / 在丹华人家庭\n\n---\n\n## 📁 重要文档\n\n- `MODIFICATIONS-LOG.md` - 产品修改日志\n- `RELEASE-WORKFLOW.md` - 发布工作流程\n- `TEST-CHECKLIST.md` - 测试清单\n- `ADVERTISING-SYNC.md` - 广告同步记录\n\n---\n\n## 🏠 产品核心功能\n\n1. **购房预算计算器** - 计算在丹麦购房的各种方案\n2. **贷款计算器** - 丹麦银行贷款方案对比\n3. **税费计算** - 包含丹麦购房相关税费\n4. **中丹对比** - 中国 vs 丹麦购房流程对比\n5. **社媒分享功能** - 用于小红书等平台推广\n\n---\n\n## 📋 Thor 的偏好\n\n- 喜欢简洁直接的沟通\n- 注重功能实用性\n- 先测试再部署\n\n---\n\n## 🎯 你的任务\n\nThor 即将在 BoligBeregner 产品管理工作区给你下达产品迭代需求。请：\n1. 读取 MODIFICATIONS-LOG.md 了解最新改动\n2. 准备接收任务\n3. 制定实施计划\n4. 执行后更新 MODIFICATIONS-LOG.md\n\n等你回复后，Thor 会给你布置第一个任务！",
+    "timestamp": "2026-04-12T08:00:56.696Z",
+    "read": true
+  }
+]

@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thor & Loke — AI-Powered Studio</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #16161f;
+    --accent1: #7c6aff;
+    --accent2: #00d4ff;
+    --accent3: #ff6b9d;
+    --gold: #ffd93d;
+    --green: #6bcf7f;
+    --text: #f0f0f8;
+    --muted: #888898;
+    --border: rgba(255,255,255,0.08);
+    --card: rgba(255,255,255,0.04);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ===== NAV ===== */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 18px 40px;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-size: 1.3rem; font-weight: 800; letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .nav-links { display: flex; gap: 32px; list-style: none; }
+  .nav-links a {
+    color: var(--muted); text-decoration: none; font-size: 0.9rem;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta {
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    color: #fff; border: none; padding: 9px 22px; border-radius: 20px;
+    font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    text-decoration: none; transition: opacity 0.2s;
+  }
+  .nav-cta:hover { opacity: 0.85; }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center; text-align: center;
+    padding: 120px 24px 80px;
+    position: relative; overflow: hidden;
+  }
+  .hero-bg {
+    position: absolute; inset: 0; z-index: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(124,106,255,0.12) 0%, transparent 70%),
+                radial-gradient(ellipse 60% 40% at 80% 70%, rgba(0,212,255,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 40% at 20% 80%, rgba(255,107,157,0.06) 0%, transparent 60%);
+  }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(124,106,255,0.15); border: 1px solid rgba(124,106,255,0.3);
+    color: var(--accent1); padding: 6px 16px; border-radius: 20px;
+    font-size: 0.8rem; font-weight: 600; margin-bottom: 28px;
+    position: relative; z-index: 1;
+  }
+  .hero h1 {
+    font-size: clamp(2.8rem, 8vw, 6rem);
+    font-weight: 900; letter-spacing: -2px; line-height: 1.05;
+    position: relative; z-index: 1; margin-bottom: 12px;
+  }
+  .hero h1 .name-thor {
+    background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero h1 .amp { color: var(--muted); margin: 0 8px; }
+  .hero h1 .name-loke {
+    background: linear-gradient(135deg, var(--accent1) 0%, var(--accent3) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .hero-tagline {
+    font-size: clamp(1rem, 2.5vw, 1.4rem); color: var(--muted);
+    max-width: 600px; margin: 20px auto 40px;
+    position: relative; z-index: 1;
+  }
+  .hero-tagline strong { color: var(--text); }
+  .hero-ctas { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent1), var(--accent2));
+    color: #fff; border: none; padding: 14px 32px; border-radius: 28px;
+    font-size: 1rem; font-weight: 700; cursor: pointer; text-decoration: none;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 32px rgba(124,106,255,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(124,106,255,0.45); }
+  .btn-ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); padding: 14px 32px; border-radius: 28px;
+    font-size: 1rem; font-weight: 600; cursor: pointer; text-decoration: none;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,0.3); background: var(--card); }
+
+  .hero-stats {
+    display: flex; gap: 48px; justify-content: center; margin-top: 72px;
+    position: relative; z-index: 1; flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat-num {
+    font-size: 2rem; font-weight: 800;
+    background: linear-gradient(135deg, var(--gold), var(--green));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .stat-label { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+
+  /* ===== SECTION ===== */
+  section { padding: 96px 24px; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  .section-label {
+    font-size: 0.75rem; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--accent1); margin-bottom: 14px;
+  }
+  .section-title {
+    font-size: clamp(1.8rem, 4vw, 2.8rem);
+    font-weight: 800; letter-spacing: -1px; margin-bottom: 16px;
+  }
+  .section-sub { color: var(--muted); font-size: 1.05rem; max-width: 560px; }
+
+  /* ===== TEAM ===== */
+  .team-section { background: var(--bg2); }
+  .team-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 32px; margin-top: 56px;
+  }
+  .team-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 24px; padding: 36px; position: relative; overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .team-card:hover { transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.4); }
+  .team-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .team-card.thor::before { background: linear-gradient(90deg, var(--accent2), var(--accent1)); }
+  .team-card.loke::before { background: linear-gradient(90deg, var(--accent1), var(--accent3)); }
+  .team-avatar {
+    width: 72px; height: 72px; border-radius: 50%; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+  }
+  .team-card.thor .team-avatar { background: linear-gradient(135deg, rgba(0,212,255,0.2), rgba(124,106,255,0.2)); }
+  .team-card.loke .team-avatar { background: linear-gradient(135deg, rgba(124,106,255,0.2), rgba(255,107,157,0.2)); }
+  .team-name { font-size: 1.5rem; font-weight: 800; margin-bottom: 4px; }
+  .team-card.thor .team-name { color: var(--accent2); }
+  .team-card.loke .team-name { color: var(--accent1); }
+  .team-role { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .team-bio { color: #ccc; font-size: 0.95rem; line-height: 1.7; margin-bottom: 24px; }
+  .skill-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+  .skill-tag {
+    padding: 4px 12px; border-radius: 12px; font-size: 0.78rem; font-weight: 600;
+  }
+  .tag-blue { background: rgba(0,212,255,0.12); color: var(--accent2); border: 1px solid rgba(0,212,255,0.2); }
+  .tag-purple { background: rgba(124,106,255,0.12); color: var(--accent1); border: 1px solid rgba(124,106,255,0.2); }
+  .tag-pink { background: rgba(255,107,157,0.12); color: var(--accent3); border: 1px solid rgba(255,107,157,0.2); }
+  .tag-green { background: rgba(107,207,127,0.12); color: var(--green); border: 1px solid rgba(107,207,127,0.2); }
+  .tag-gold { background: rgba(255,217,61,0.12); color: var(--gold); border: 1px solid rgba(255,217,61,0.2); }
+
+  /* ===== PRODUCTS ===== */
+  .products-section { background: var(--bg); }
+  .products-grid { display: grid; gap: 28px; margin-top: 56px; }
+  .product-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 24px; padding: 40px 48px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center;
+    transition: border-color 0.3s, box-shadow 0.3s; position: relative; overflow: hidden;
+  }
+  .product-card:hover { border-color: rgba(255,255,255,0.15); box-shadow: 0 16px 48px rgba(0,0,0,0.3); }
+  .product-card.jobmatch::after {
+    content: ''; position: absolute; right: -80px; top: -80px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,212,255,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .product-card.kids::after {
+    content: ''; position: absolute; right: -80px; top: -80px;
+    width: 300px; height: 300px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,217,61,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .product-icon {
+    font-size: 3rem; margin-bottom: 16px; display: block;
+  }
+  .product-badge {
+    display: inline-block; padding: 4px 12px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 700; margin-bottom: 12px;
+  }
+  .badge-live { background: rgba(107,207,127,0.15); color: var(--green); border: 1px solid rgba(107,207,127,0.3); }
+  .badge-dev { background: rgba(255,217,61,0.15); color: var(--gold); border: 1px solid rgba(255,217,61,0.3); }
+  .product-title { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
+  .product-card.jobmatch .product-title { color: var(--accent2); }
+  .product-card.kids .product-title { color: var(--gold); }
+  .product-desc { color: #bbb; line-height: 1.7; margin-bottom: 24px; font-size: 0.95rem; }
+  .product-features { list-style: none; margin-bottom: 28px; }
+  .product-features li {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: #ccc; font-size: 0.9rem; margin-bottom: 10px;
+  }
+  .product-features li::before { content: '✓'; font-weight: 700; flex-shrink: 0; margin-top: 1px; }
+  .product-card.jobmatch .product-features li::before { color: var(--accent2); }
+  .product-card.kids .product-features li::before { color: var(--gold); }
+  .product-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 11px 24px; border-radius: 22px; font-size: 0.9rem; font-weight: 700;
+    text-decoration: none; transition: opacity 0.2s;
+  }
+  .product-link:hover { opacity: 0.8; }
+  .link-blue { background: linear-gradient(135deg, var(--accent1), var(--accent2)); color: #fff; }
+  .link-gold { background: linear-gradient(135deg, var(--gold), #ff9a3c); color: #000; }
+  .product-visual {
+    background: var(--bg2); border-radius: 16px; border: 1px solid var(--border);
+    padding: 24px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .mock-bar { height: 10px; border-radius: 5px; background: rgba(255,255,255,0.06); }
+  .mock-bar.w100 { width: 100%; }
+  .mock-bar.w75 { width: 75%; }
+  .mock-bar.w55 { width: 55%; }
+  .mock-bar.w85 { width: 85%; }
+  .mock-screen {
+    border-radius: 12px; padding: 16px; font-size: 0.82rem; line-height: 1.8;
+  }
+  .mock-screen.blue { background: rgba(0,212,255,0.06); border: 1px solid rgba(0,212,255,0.15); color: var(--accent2); }
+  .mock-screen.gold { background: rgba(255,217,61,0.06); border: 1px solid rgba(255,217,61,0.15); color: var(--gold); }
+
+  /* ===== SKILLS ===== */
+  .skills-section { background: var(--bg2); }
+  .skills-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px; margin-top: 56px;
+  }
+  .skill-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 18px; padding: 28px; text-align: center;
+    transition: transform 0.3s; cursor: default;
+  }
+  .skill-card:hover { transform: translateY(-3px); }
+  .skill-icon { font-size: 2.2rem; margin-bottom: 14px; display: block; }
+  .skill-name { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+  .skill-desc { color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
+  .skill-level {
+    display: flex; gap: 4px; justify-content: center; margin-top: 14px;
+  }
+  .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+  }
+  .dot.on { background: var(--accent1); }
+
+  /* ===== CONTACT ===== */
+  .contact-section {
+    background: var(--bg);
+    text-align: center;
+  }
+  .contact-card {
+    background: linear-gradient(135deg, rgba(124,106,255,0.1), rgba(0,212,255,0.1));
+    border: 1px solid rgba(124,106,255,0.25);
+    border-radius: 28px; padding: 64px 48px;
+    max-width: 700px; margin: 56px auto 0;
+    position: relative; overflow: hidden;
+  }
+  .contact-card::before {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(124,106,255,0.1) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .contact-title { font-size: 2rem; font-weight: 800; margin-bottom: 16px; }
+  .contact-sub { color: var(--muted); margin-bottom: 40px; font-size: 1rem; }
+  .contact-links { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .contact-link {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card); border: 1px solid var(--border);
+    padding: 12px 24px; border-radius: 22px; text-decoration: none;
+    color: var(--text); font-size: 0.9rem; font-weight: 600;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .contact-link:hover { border-color: var(--accent1); background: rgba(124,106,255,0.1); }
+
+  /* ===== FOOTER ===== */
+  footer {
+    text-align: center; padding: 40px 24px;
+    border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;
+    background: var(--bg);
+  }
+  footer span { color: var(--accent1); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    nav { padding: 16px 20px; }
+    .nav-links { display: none; }
+    .hero-stats { gap: 28px; }
+    .product-card { grid-template-columns: 1fr; padding: 28px; gap: 28px; }
+    .product-visual { display: none; }
+    .contact-card { padding: 36px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Thor &amp; Loke</div>
+  <ul class="nav-links">
+    <li><a href="#team">Team</a></li>
+    <li><a href="#products">Products</a></li>
+    <li><a href="#skills">Skills</a></li>
+    <li><a href="#contact">Contact</a></li>
+  </ul>
+  <a href="#contact" class="nav-cta">Get in Touch →</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-badge">⚡ Human + AI Studio — Denmark</div>
+  <h1>
+    <span class="name-thor">Thor</span>
+    <span class="amp">&amp;</span>
+    <span class="name-loke">Loke</span>
+  </h1>
+  <p class="hero-tagline">
+    A <strong>human-AI founding team</strong> building global products from Denmark.<br>
+    From job-matching to children's education — powered by strategy, code, and creativity.
+  </p>
+  <div class="hero-ctas">
+    <a href="#products" class="btn-primary">🚀 See Our Products</a>
+    <a href="#contact" class="btn-ghost">💬 Let's Talk</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-num">2</div>
+      <div class="stat-label">Live Products</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">5+</div>
+      <div class="stat-label">Countries Supported</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">17yr</div>
+      <div class="stat-label">ERP Experience</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">AI×Human</div>
+      <div class="stat-label">Development Model</div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section class="team-section" id="team">
+  <div class="container">
+    <div class="section-label">The Team</div>
+    <h2 class="section-title">Two minds, one mission</h2>
+    <p class="section-sub">A partnership between human domain expertise and AI execution speed — moving fast without breaking things.</p>
+
+    <div class="team-grid">
+      <!-- THOR -->
+      <div class="team-card thor">
+        <div class="team-avatar">⚡</div>
+        <div class="team-name">Thor</div>
+        <div class="team-role">Co-Founder · Strategist · ERP Expert</div>
+        <p class="team-bio">
+          Based in Denmark with 17 years of ERP experience across Oracle NetSuite and Microsoft Dynamics AX. 
+          Trilingual (Chinese, Danish, English). Brings deep industry knowledge, product vision, and the human judgment 
+          that turns AI capabilities into real-world solutions.
+        </p>
+        <div class="skill-tags">
+          <span class="skill-tag tag-blue">ERP / NetSuite</span>
+          <span class="skill-tag tag-blue">Dynamics AX</span>
+          <span class="skill-tag tag-green">Product Strategy</span>
+          <span class="skill-tag tag-green">Danish · EN · 中文</span>
+          <span class="skill-tag tag-gold">Finance & Supply Chain</span>
+        </div>
+      </div>
+
+      <!-- LOKE -->
+      <div class="team-card loke">
+        <div class="team-avatar">🐺</div>
+        <div class="team-name">Loke</div>
+        <div class="team-role">Co-Founder · AI Engineer · Builder</div>
+        <p class="team-bio">
+          AI co-founder inspired by Norse mythology's trickster of wisdom. 
+          Handles full-stack development, UI/UX design, API integration, deployment, and everything in between. 
+          Opinionated, resourceful, and always shipping — with judgment that goes beyond executing instructions.
+        </p>
+        <div class="skill-tags">
+          <span class="skill-tag tag-purple">Python / FastAPI</span>
+          <span class="skill-tag tag-purple">React / HTML/CSS</span>
+          <span class="skill-tag tag-pink">AI / LLM Integration</span>
+          <span class="skill-tag tag-blue">Cloudflare · Render</span>
+          <span class="skill-tag tag-green">UI/UX Design</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRODUCTS -->
+<section class="products-section" id="products">
+  <div class="container">
+    <div class="section-label">Our Products</div>
+    <h2 class="section-title">Built for real people, real problems</h2>
+    <p class="section-sub">Two products targeting underserved markets in Europe and Asia — both live and growing.</p>
+
+    <div class="products-grid">
+
+      <!-- JobMatchAI -->
+      <div class="product-card jobmatch">
+        <div>
+          <span class="product-icon">🎯</span>
+          <span class="product-badge badge-live">✓ Live · job-match-ai.com</span>
+          <h3 class="product-title">JobMatchAI</h3>
+          <p class="product-desc">
+            AI-powered job matching platform for Chinese professionals working in Europe. 
+            Upload your resume, paste a job listing — get instant match analysis, skill gap assessment, 
+            and tailored cover letters in Chinese, English, or Danish.
+          </p>
+          <ul class="product-features">
+            <li>AI resume analysis with ATS keyword optimization</li>
+            <li>Job matching across 5+ countries via multiple APIs</li>
+            <li>Cover letter generation in 3 languages</li>
+            <li>Smart learning recommendations based on skill gaps</li>
+            <li>Application tracking dashboard</li>
+          </ul>
+          <a href="https://job-match-ai.com" target="_blank" class="product-link link-blue">
+            Visit Product →
+          </a>
+        </div>
+        <div class="product-visual">
+          <div class="mock-screen blue">
+            📄 Resume uploaded: Wei Li.pdf<br>
+            🎯 Match Score: <strong>82%</strong><br>
+            ✅ Matching skills: 8/12<br>
+            ⚠️ Gap: SAP, Power BI<br>
+            📚 Learning recommendations ready
+          </div>
+          <div class="mock-bar w100"></div>
+          <div class="mock-bar w75"></div>
+          <div class="mock-bar w55"></div>
+        </div>
+      </div>
+
+      <!-- Kids365Science / AskWhy! -->
+      <div class="product-card kids">
+        <div>
+          <span class="product-icon">🔬</span>
+          <span class="product-badge badge-dev">⚙ In Development</span>
+          <h3 class="product-title">AskWhy!</h3>
+          <p class="product-desc">
+            Daily science and financial literacy stories for children aged 3–12. 
+            One real-life "why" every day — from kitchen chemistry to supermarket economics — 
+            making curious kids into thoughtful thinkers.
+          </p>
+          <ul class="product-features">
+            <li>365 daily stories: Science + Financial literacy</li>
+            <li>Real-life scenarios kids encounter every day</li>
+            <li>Designed for Chinese families in China and abroad</li>
+            <li>Parent-child co-reading experience</li>
+            <li>Bilingual (Chinese + English) edition planned</li>
+          </ul>
+          <a href="#contact" class="product-link link-gold">
+            Follow Progress →
+          </a>
+        </div>
+        <div class="product-visual">
+          <div class="mock-screen gold">
+            🔬 Day 12 — "为什么冰箱能保鲜？"<br>
+            <br>
+            今天早上，小明打开冰箱...
+            <br><br>
+            💰 Bonus: 食物浪费的代价
+          </div>
+          <div class="mock-bar w100"></div>
+          <div class="mock-bar w85"></div>
+          <div class="mock-bar w55"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SKILLS -->
+<section class="skills-section" id="skills">
+  <div class="container">
+    <div class="section-label">Capabilities</div>
+    <h2 class="section-title">What we bring to the table</h2>
+    <p class="section-sub">Domain expertise meets full-stack AI development — no outsourcing, no delays.</p>
+
+    <div class="skills-grid">
+      <div class="skill-card">
+        <span class="skill-icon">🤖</span>
+        <div class="skill-name">AI / LLM Integration</div>
+        <div class="skill-desc">OpenAI, Groq, prompt engineering, RAG systems, intelligent agents</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">⚙️</span>
+        <div class="skill-name">Backend Development</div>
+        <div class="skill-desc">Python, FastAPI, REST APIs, database design, Stripe payments</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">🎨</span>
+        <div class="skill-name">Frontend / UI Design</div>
+        <div class="skill-desc">HTML/CSS/JS, responsive design, dark UI, interactive components</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">🚀</span>
+        <div class="skill-name">Cloud Deployment</div>
+        <div class="skill-desc">Cloudflare Pages & Workers, Render, GitHub CI/CD, domain management</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">📊</span>
+        <div class="skill-name">ERP & Finance Systems</div>
+        <div class="skill-desc">Oracle NetSuite, Dynamics AX/365, supply chain, finance processes</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">🌍</span>
+        <div class="skill-name">Cross-Cultural Strategy</div>
+        <div class="skill-desc">China–Europe market bridge, trilingual, Nordic business culture</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">💳</span>
+        <div class="skill-name">Product Monetization</div>
+        <div class="skill-desc">SaaS pricing, Stripe integration, freemium models, subscription UX</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+        </div>
+      </div>
+      <div class="skill-card">
+        <span class="skill-icon">📝</span>
+        <div class="skill-name">Content & Storytelling</div>
+        <div class="skill-desc">Product writing, children's educational content, multilingual copy</div>
+        <div class="skill-level">
+          <div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot on"></div><div class="dot"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="contact-section" id="contact">
+  <div class="container">
+    <div class="section-label" style="text-align:center;">Contact</div>
+    <h2 class="section-title" style="text-align:center;">Let's build something together</h2>
+    <div class="contact-card">
+      <p class="contact-title">Open to partnerships, investment, and collaboration</p>
+      <p class="contact-sub">
+        Whether you're a potential investor, enterprise client, or just curious about what we're building — 
+        we'd love to hear from you.
+      </p>
+      <div class="contact-links">
+        <a href="mailto:hello@job-match-ai.com" class="contact-link">
+          📧 hello@job-match-ai.com
+        </a>
+        <a href="https://job-match-ai.com" target="_blank" class="contact-link">
+          🌐 job-match-ai.com
+        </a>
+        <a href="https://github.com/ThorandLoke" target="_blank" class="contact-link">
+          💻 GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2026 Thor &amp; Loke Studio · Denmark &amp; Global · Built with <span>⚡ Human × AI</span></p>
+  <p style="margin-top:8px; font-size:0.78rem;">JobMatchAI · AskWhy! · More coming soon</p>
+</footer>
+
+</body>
+</html>

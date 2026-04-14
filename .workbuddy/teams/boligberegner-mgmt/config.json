@@ -1,0 +1,23 @@
+{
+  "name": "boligberegner-mgmt",
+  "leadAgentId": "4a280849d1c84babad6d0d915ea5e6f8",
+  "workspacePath": "/Users/weili/WorkBuddy/Claw",
+  "createdAt": "2026-04-12T07:19:11.098Z",
+  "options": {
+    "workspacePath": "/Users/weili/WorkBuddy/Claw",
+    "isAutoTeam": false
+  },
+  "members": [
+    {
+      "memberId": "team-lead@boligberegner-mgmt",
+      "name": "team-lead",
+      "role": "Team Lead - coordinates the team and interacts with the user"
+    },
+    {
+      "memberId": "boligberegner-pm@boligberegner-mgmt",
+      "name": "boligberegner-pm",
+      "role": "BoligBeregner 产品经理"
+    }
+  ],
+  "isAutoTeam": false
+}

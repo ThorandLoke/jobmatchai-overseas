@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e3a5f"/>
+      <stop offset="100%" style="stop-color:#2563eb"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  
+  <!-- House icon -->
+  <g transform="translate(80, 180)" fill="white" opacity="0.9">
+    <path d="M50 0 L100 50 L100 120 L0 120 L0 50 Z"/>
+    <rect x="35" y="60" width="30" height="60" fill="#1e3a5f"/>
+    <rect x="70" y="30" width="20" height="20" fill="#1e3a5f"/>
+  </g>
+  
+  <!-- Calculator icon -->
+  <g transform="translate(950, 180)" fill="white" opacity="0.9">
+    <rect x="0" y="0" width="70" height="100" rx="8"/>
+    <rect x="10" y="10" width="50" height="30" rx="4" fill="#1e3a5f"/>
+    <rect x="10" y="50" width="15" height="15" rx="2" fill="#1e3a5f"/>
+    <rect x="28" y="50" width="15" height="15" rx="2" fill="#1e3a5f"/>
+    <rect x="46" y="50" width="15" height="15" rx="2" fill="#1e3a5f"/>
+    <rect x="10" y="70" width="15" height="15" rx="2" fill="#1e3a5f"/>
+    <rect x="28" y="70" width="15" height="15" rx="2" fill="#1e3a5f"/>
+    <rect x="46" y="70" width="15" height="15" rx="2" fill="#1e3a5f"/>
+  </g>
+  
+  <!-- Main title -->
+  <text x="600" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white">
+    BOLIGBEREGNER
+  </text>
+  
+  <!-- Subtitle -->
+  <text x="600" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="white" opacity="0.9">
+    Gratis beregner for køb, salg og renovering
+  </text>
+  
+  <!-- Footer keywords -->
+  <rect x="200" y="520" width="800" height="50" rx="25" fill="white" opacity="0.15"/>
+  <text x="600" y="555" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" fill="white" opacity="0.9">
+    danmark • boliglån • energiforbedring • varmepumpe
+  </text>
+</svg>

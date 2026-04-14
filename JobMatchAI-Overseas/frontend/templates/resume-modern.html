@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简历 - Modern Minimal</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 10.5pt;
+            line-height: 1.65;
+            color: #1a1a2e;
+            background: #fafafa;
+            padding: 20px;
+        }
+        .resume {
+            max-width: 850px;
+            margin: 0 auto;
+            background: #fff;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        
+        /* Header - 左侧彩色边栏 */
+        .header {
+            display: flex;
+            min-height: 180px;
+        }
+        .header-left {
+            width: 6px;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            flex-shrink: 0;
+        }
+        .header-right {
+            flex: 1;
+            padding: 35px 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .name {
+            font-size: 26pt;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+        .title {
+            font-size: 12pt;
+            color: #667eea;
+            font-weight: 500;
+            margin-bottom: 18px;
+        }
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px 25px;
+        }
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 9.5pt;
+            color: #4a4a6a;
+        }
+        .contact-icon {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            background: #f0f0ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #667eea;
+            font-size: 9pt;
+        }
+        
+        /* Content */
+        .content {
+            padding: 0 40px 30px;
+        }
+        
+        /* Section */
+        .section {
+            padding: 22px 0;
+            border-top: 1px solid #eee;
+        }
+        .section:first-child { border-top: none; }
+        
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .section-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 12pt;
+        }
+        .section-title {
+            font-size: 11pt;
+            font-weight: 700;
+            color: #1a1a2e;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+        
+        /* Summary */
+        .summary {
+            color: #4a4a6a;
+            line-height: 1.7;
+        }
+        
+        /* Experience */
+        .experience-item {
+            margin-bottom: 20px;
+            padding-left: 15px;
+            border-left: 2px solid #e8e8ff;
+        }
+        .experience-item:last-child { margin-bottom: 0; }
+        .experience-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 4px;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+        .job-title {
+            font-weight: 600;
+            font-size: 11pt;
+            color: #1a1a2e;
+        }
+        .date {
+            font-size: 9pt;
+            color: #999;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .company-line {
+            font-size: 10pt;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+        .company-name { font-weight: 500; }
+        .company-loc { color: #999; }
+        .description {
+            color: #4a4a6a;
+            font-size: 10pt;
+        }
+        .description li {
+            margin-bottom: 4px;
+        }
+        
+        /* Skills */
+        .skills-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .skill-group {
+            background: #fafafa;
+            padding: 12px 15px;
+            border-radius: 8px;
+        }
+        .skill-group-title {
+            font-weight: 600;
+            font-size: 9.5pt;
+            color: #667eea;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .skill-list {
+            font-size: 10pt;
+            color: #4a4a6a;
+            line-height: 1.8;
+        }
+        
+        /* Education */
+        .education-item {
+            margin-bottom: 15px;
+        }
+        .education-item:last-child { margin-bottom: 0; }
+        .edu-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        .degree {
+            font-weight: 600;
+            color: #1a1a2e;
+        }
+        .school {
+            color: #4a4a6a;
+        }
+        .edu-date {
+            font-size: 9pt;
+            color: #999;
+        }
+        
+        /* Languages */
+        .lang-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .lang-item {
+            background: #f0f0ff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 10pt;
+            color: #4a4a6a;
+        }
+        
+        /* Print */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .resume { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="resume">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left"></div>
+            <div class="header-right">
+                <div class="name">{{NAME}}</div>
+                <div class="title">{{TITLE}}</div>
+                <div class="contact-grid">
+                    <div class="contact-item">
+                        <span class="contact-icon">✉</span>
+                        {{EMAIL}}
+                    </div>
+                    <div class="contact-item">
+                        <span class="contact-icon">☎</span>
+                        {{PHONE}}
+                    </div>
+                    <div class="contact-item">
+                        <span class="contact-icon">⌖</span>
+                        {{LOCATION}}
+                    </div>
+                    {{#LINKEDIN}}
+                    <div class="contact-item">
+                        <span class="contact-icon">in</span>
+                        {{LINKEDIN}}
+                    </div>
+                    {{/LINKEDIN}}
+                </div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- Summary -->
+            {{#SUMMARY}}
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">◈</div>
+                    <div class="section-title">About</div>
+                </div>
+                <p class="summary">{{SUMMARY}}</p>
+            </div>
+            {{/SUMMARY}}
+            
+            <!-- Experience -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">◉</div>
+                    <div class="section-title">Experience</div>
+                </div>
+                {{#EXPERIENCE}}
+                <div class="experience-item">
+                    <div class="experience-header">
+                        <span class="job-title">{{JOB_TITLE}}</span>
+                        <span class="date">{{DATE_RANGE}}</span>
+                    </div>
+                    <div class="company-line">
+                        <span class="company-name">{{COMPANY}}</span>
+                        {{#LOCATION}}<span class="company-loc"> · {{LOCATION}}</span>{{/LOCATION}}
+                    </div>
+                    <ul class="description">
+                        {{#DESCRIPTION}}<li>{{.}}</li>{{/DESCRIPTION}}
+                    </ul>
+                </div>
+                {{/EXPERIENCE}}
+            </div>
+            
+            <!-- Skills -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">◆</div>
+                    <div class="section-title">Skills</div>
+                </div>
+                <div class="skills-container">
+                    {{#SKILLS}}
+                    <div class="skill-group">
+                        <div class="skill-group-title">{{CATEGORY}}</div>
+                        <div class="skill-list">{{ITEMS}}</div>
+                    </div>
+                    {{/SKILLS}}
+                </div>
+            </div>
+            
+            <!-- Education -->
+            {{#EDUCATION}}
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">◇</div>
+                    <div class="section-title">Education</div>
+                </div>
+                {{#EDUCATION}}
+                <div class="education-item">
+                    <div class="edu-header">
+                        <span class="degree">{{DEGREE}}</span>
+                        <span class="edu-date">{{DATE_RANGE}}</span>
+                    </div>
+                    <div class="school">{{SCHOOL}}{{#GPA}} · GPA: {{GPA}}{{/GPA}}</div>
+                </div>
+                {{/EDUCATION}}
+            </div>
+            {{/EDUCATION}}
+            
+            <!-- Languages -->
+            {{#LANGUAGES}}
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">◎</div>
+                    <div class="section-title">Languages</div>
+                </div>
+                <div class="lang-grid">
+                    {{#LANGUAGES}}<span class="lang-item">{{.}}</span>{{/LANGUAGES}}
+                </div>
+            </div>
+            {{/LANGUAGES}}
+        </div>
+    </div>
+</body>
+</html>

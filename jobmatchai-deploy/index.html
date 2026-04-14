@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<!--
+JobMatchAI - 智能入口
+自动检测浏览器语言，重定向到对应版本
+-->
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="JobMatchAI - AI智能求职助手">
+    <title>JobMatchAI - 智能求职助手</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            margin: 0;
+        }
+        .loading {
+            text-align: center;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        p {
+            color: #ccc;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>正在加载 JobMatchAI...</p>
+    </div>
+
+    <script>
+        // 自动检测语言并跳转
+        (function() {
+            const browserLang = navigator.language || navigator.userLanguage || 'en';
+            const lang = browserLang.toLowerCase();
+
+            // 判断是否中文用户
+            const isChinese = lang.startsWith('zh');
+
+            // 根据语言选择对应版本
+            const targetPage = isChinese ? 'index-zh.html' : 'index-en.html';
+
+            console.log('Detected language:', browserLang, '-> Redirecting to:', targetPage);
+
+            // 延迟一点跳转，让用户看到加载动画
+            setTimeout(function() {
+                window.location.href = targetPage;
+            }, 500);
+        })();
+    </script>
+</body>
+</html>

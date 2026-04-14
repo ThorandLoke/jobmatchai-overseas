@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume Templates - JobMatchAI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            min-height: 100vh;
+            color: #fff;
+            padding: 40px 20px;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 40px; }
+        header h1 { font-size: 2rem; margin-bottom: 10px; }
+        header p { color: #ccc; font-size: 1rem; }
+        .badge {
+            display: inline-block;
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-bottom: 15px;
+        }
+        
+        .templates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+        
+        .template-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .template-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .template-preview {
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .template-preview::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.3) 100%);
+        }
+        
+        .template-info { padding: 20px; }
+        .template-name { font-size: 1.1rem; font-weight: 600; margin-bottom: 8px; }
+        .template-desc { font-size: 0.85rem; color: #ccc; margin-bottom: 15px; line-height: 1.5; }
+        
+        .template-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 15px;
+        }
+        .tag {
+            background: rgba(255,255,255,0.1);
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.75rem;
+            color: #ddd;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,212,255,0.3); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            margin-top: 8px;
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.2); }
+        
+        .external-section {
+            background: rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title span { font-size: 1.5rem; }
+        
+        .external-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .external-link {
+            background: rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 15px;
+            text-decoration: none;
+            color: #fff;
+            transition: all 0.3s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .external-link:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-3px);
+            border-color: #00d4ff;
+        }
+        .external-link h4 { font-size: 0.95rem; margin-bottom: 5px; }
+        .external-link p { font-size: 0.8rem; color: #aaa; }
+        
+        .tips-section {
+            background: rgba(0,212,255,0.1);
+            border-radius: 16px;
+            padding: 25px;
+            border: 1px solid rgba(0,212,255,0.2);
+        }
+        .tips-section h3 { margin-bottom: 15px; font-size: 1.1rem; }
+        .tip-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            color: #ddd;
+        }
+        .tip-icon { color: #00d4ff; font-weight: bold; }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #00d4ff;
+            text-decoration: none;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+        }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">Back to JobMatchAI</a>
+        
+        <header>
+            <div class="badge">NEW</div>
+            <h1>Resume Templates</h1>
+            <p>Choose a professional template, download and customize your resume</p>
+        </header>
+        
+        <div class="templates-grid">
+            <div class="template-card">
+                <div class="template-preview" style="background: linear-gradient(135deg, #1a365d, #2c5282);">
+                    Classic
+                </div>
+                <div class="template-info">
+                    <div class="template-name">Professional Classic</div>
+                    <div class="template-desc">Deep blue classic style, ideal for finance, consulting, and management roles</div>
+                    <div class="template-tags">
+                        <span class="tag">Finance</span>
+                        <span class="tag">Consulting</span>
+                        <span class="tag">Management</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="downloadTemplate('classic')">Use Template</button>
+                    <button class="btn btn-secondary" onclick="previewTemplate('classic')">Preview</button>
+                </div>
+            </div>
+            
+            <div class="template-card">
+                <div class="template-preview" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    Modern
+                </div>
+                <div class="template-info">
+                    <div class="template-name">Modern Minimal</div>
+                    <div class="template-desc">Left-side colorful bar, ideal for IT, tech, and internet companies</div>
+                    <div class="template-tags">
+                        <span class="tag">IT</span>
+                        <span class="tag">Tech</span>
+                        <span class="tag">Internet</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="downloadTemplate('modern')">Use Template</button>
+                    <button class="btn btn-secondary" onclick="previewTemplate('modern')">Preview</button>
+                </div>
+            </div>
+            
+            <div class="template-card">
+                <div class="template-preview" style="background: linear-gradient(135deg, #0f0f23, #2d1f4e);">
+                    Creative
+                </div>
+                <div class="template-info">
+                    <div class="template-name">Creative Tech</div>
+                    <div class="template-desc">Cyberpunk style, ideal for creative, marketing, and startup roles</div>
+                    <div class="template-tags">
+                        <span class="tag">Creative</span>
+                        <span class="tag">Marketing</span>
+                        <span class="tag">Startup</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="downloadTemplate('creative')">Use Template</button>
+                    <button class="btn btn-secondary" onclick="previewTemplate('creative')">Preview</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="external-section">
+            <div class="section-title">
+                <span>More Templates</span>
+            </div>
+            <p style="color: #ccc; margin-bottom: 20px; font-size: 0.9rem;">
+                We recommend these popular platforms for more resume templates:
+            </p>
+            <div class="external-links">
+                <a href="https://www.canva.com/resumes/templates/" target="_blank" class="external-link">
+                    <h4>Canva</h4>
+                    <p>Free templates + Online editor</p>
+                </a>
+                <a href="https://zety.com/" target="_blank" class="external-link">
+                    <h4>Zety</h4>
+                    <p>750+ professional templates</p>
+                </a>
+                <a href="https://resumegenius.com/resume-templates" target="_blank" class="external-link">
+                    <h4>ResumeGenius</h4>
+                    <p>550+ free templates</p>
+                </a>
+            </div>
+        </div>
+        
+        <div class="tips-section">
+            <h3>Tips for ATS-Friendly Resumes</h3>
+            <div class="tip-item">
+                <span class="tip-icon">1.</span>
+                <span>Use standard section headers (Experience, Education, Skills)</span>
+            </div>
+            <div class="tip-item">
+                <span class="tip-icon">2.</span>
+                <span>Include keywords from the job description</span>
+            </div>
+            <div class="tip-item">
+                <span class="tip-icon">3.</span>
+                <span>Use standard fonts like Arial, Calibri, or Garamond</span>
+            </div>
+            <div class="tip-item">
+                <span class="tip-icon">4.</span>
+                <span>Keep it to 1-2 pages, save as PDF format</span>
+            </div>
+            <div class="tip-item">
+                <span class="tip-icon">5.</span>
+                <span>Quantify your achievements (e.g., "Increased sales by 30%")</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function downloadTemplate(templateId) {
+            window.location.href = '/?template=' + templateId + '&action=download';
+        }
+        
+        function previewTemplate(templateId) {
+            window.open('/templates/resume-' + templateId + '.html', '_blank');
+        }
+    </script>
+</body>
+</html>

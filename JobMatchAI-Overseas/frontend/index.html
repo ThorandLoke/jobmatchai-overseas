@@ -23,7 +23,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         // ⚙️ API 配置
         // API Key 由后端管理，前端不需要
         const API_KEY = '';
-        const API_BASE = 'https://jobmatchai-overseas.onrender.com';
+        const API_BASE = 'https://api.job-match-ai.com';
     </script>
     
     <style>
@@ -385,58 +385,29 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             <h1>🚀 <span class="gradient-text">AI驱动 · 精准匹配 · 专属定制</span></h1>
             <p style="color: #aaa; margin-top: 8px; font-size: 0.95rem;">根据您的目标职位，智能优化简历，生成专属求职信</p>
             
-            <!-- 新3步引导流程 -->
-            <div style="display: flex; justify-content: center; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 24px;">
-                <span style="color: #ffd700; font-weight: 600;">①</span>
-                <span>💼</span>
-                <span style="color: #ccc; font-size: 0.9rem;">选职位</span>
-                <span style="color: rgba(255,255,255,0.3);">→</span>
-                <span style="color: #ffd700; font-weight: 600;">②</span>
-                <span>📄</span>
-                <span style="color: #ccc; font-size: 0.9rem;">精修简历</span>
-                <span style="color: rgba(255,255,255,0.3);">→</span>
-                <span style="color: #ffd700; font-weight: 600;">③</span>
-                <span>✉️</span>
-                <span style="color: #ccc; font-size: 0.9rem;">生成求职信</span>
+            <!-- 4步引导流程 -->
+            <div style="display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 24px;">
+                <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
+                    <span style="color: #00d4ff;">①</span> 💼 <strong>选职位</strong>
+                </span>
+                <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
+                <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
+                    <span style="color: #00d4ff;">②</span> 📄 <strong>精修简历</strong>
+                </span>
+                <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
+                <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
+                    <span style="color: #00d4ff;">③</span> ✉️ <strong>生成求职信</strong>
+                </span>
+                <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
+                <span style="background: rgba(230,162,60,0.15); border: 1px solid rgba(230,162,60,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
+                    <span style="color: #ffd60a;">④</span> 🎯 <strong>定向补强 · 技能 Gap</strong>
+                </span>
             </div>
             
             <!-- 立即开始按钮 -->
             <button class="btn btn-primary" onclick="switchTab('search')" style="font-size: 1.1rem; padding: 14px 32px; margin-top: 20px;">
                 💼 从选职位开始 →
             </button>
-        </div>
-        
-        <!-- 价值主张卡片 -->
-        <div class="value-props" style="gap: 12px;">
-            <div class="prop-card" style="padding: 16px;">
-                <div class="prop-icon" style="font-size: 1.2rem;">🎯</div>
-                <h3 style="font-size: 0.95rem;">职位导向精准优化</h3>
-                <p style="font-size: 0.85rem;">根据目标职位要求，智能突出简历中最相关的技能与经验</p>
-            </div>
-            <div class="prop-card" style="padding: 16px;">
-                <div class="prop-icon" style="font-size: 1.2rem;">✍️</div>
-                <h3 style="font-size: 0.95rem;">专属求职信</h3>
-                <p style="font-size: 0.85rem;">基于职位与简历，生成独一无二的定制求职信，让招聘官眼前一亮</p>
-            </div>
-        </div>
-        
-        <!-- 求职流程指引 -->
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
-            <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
-                <span style="color: #00d4ff;">①</span> 💼 <strong>选职位</strong>
-            </span>
-            <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
-            <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
-                <span style="color: #00d4ff;">②</span> 📄 <strong>精修简历</strong>
-            </span>
-            <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
-            <span style="background: rgba(0,212,255,0.15); border: 1px solid rgba(0,212,255,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
-                <span style="color: #00d4ff;">③</span> ✉️ <strong>生成求职信</strong>
-            </span>
-            <span style="color: rgba(255,255,255,0.4); font-size: 1.2rem;">→</span>
-            <span style="background: rgba(230,162,60,0.15); border: 1px solid rgba(230,162,60,0.4); border-radius: 20px; padding: 8px 14px; font-size: 0.85rem; color: #fff;">
-                <span style="color: #ffd60a;">④</span> 🎯 <strong>定向补强 · 技能 Gap</strong>
-            </span>
         </div>
         
         <!-- 功能标签页 - 新流程：职位 → 简历 → 求职信 -->
@@ -1383,7 +1354,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             // 永久存储（localStorage，重启浏览器后仍有效）
             localStorage.setItem('jobmatchai_premium', 'true');
             // 也通知后端（当前会话有效）
-            fetch('/payment/activate-demo', {
+            fetch(API_BASE + '/payment/activate-demo', {
                 method: 'POST',
                 body: new URLSearchParams({ plan_id: 'yearly', user_id: uid })
             }).then(r => r.json()).then(d => {
@@ -1405,7 +1376,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             if (stored === 'true') {
                 const uid = getSessionUserId();
                 // 静默激活，不打扰
-                fetch('/payment/activate-demo', {
+                fetch(API_BASE + '/payment/activate-demo', {
                     method: 'POST',
                     body: new URLSearchParams({ plan_id: 'yearly', user_id: uid })
                 }).catch(() => {});
@@ -1584,7 +1555,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const formData = new FormData();
             formData.append('file', file);
             
-            fetch('/upload-resume', {
+            fetch(API_BASE + '/upload-resume', {
                 method: 'POST',
                 body: formData
             })
@@ -1676,7 +1647,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     limit: 15
                 });
                 
-                const res = await fetch(`/jobs/search?${params}`);
+                const res = await fetch(API_BASE + `/jobs/search?${params}`);
                 const data = await res.json();
                 
                 // 完成动画
@@ -1806,7 +1777,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     formData.append('company', company);
                 }
                 
-                const res = await fetch('/analyze-resume', {
+                const res = await fetch(API_BASE + '/analyze-resume', {
                     method: 'POST',
                     body: formData
                 });
@@ -2156,7 +2127,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const userId = getSessionUserId();
                 loadingText.textContent = '⏳ 正在连接服务器...';
                 
-                const res = await fetch('/api/resume/polish', {
+                const res = await fetch(API_BASE + '/api/resume/polish', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -2303,7 +2274,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
             // 调用API应用接受的修改
             try {
-                const res = await fetch('/api/resume/apply-polish', {
+                const res = await fetch(API_BASE + '/api/resume/apply-polish', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -3126,7 +3097,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 500);
             
             try {
-                const res = await fetch('/api/resume/translate', {
+                const res = await fetch(API_BASE + '/api/resume/translate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -3485,7 +3456,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const res = await fetch('/upload-document', {
+                const res = await fetch(API_BASE + '/upload-document', {
                     method: 'POST',
                     body: formData
                 });
@@ -3494,7 +3465,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 if (data.success) {
                     // 调用AI提取职位信息
-                    const extractRes = await fetch('/api/resume/extract-job-from-text', {
+                    const extractRes = await fetch(API_BASE + '/api/resume/extract-job-from-text', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -3694,7 +3665,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const res = await fetch('/upload-job-document', {
+                const res = await fetch(API_BASE + '/upload-job-document', {
                     method: 'POST',
                     body: formData
                 });
@@ -3808,7 +3779,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('job_url', url);
                 
-                const res = await fetch('/fetch-job-from-url', {
+                const res = await fetch(API_BASE + '/fetch-job-from-url', {
                     method: 'POST',
                     body: formData
                 });
@@ -4243,7 +4214,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     formData.append('resume_structure', JSON.stringify(currentResumeStructure));
                 }
                 
-                const res = await fetch('/generate-cover-letter', {
+                const res = await fetch(API_BASE + '/generate-cover-letter', {
                     method: 'POST',
                     body: formData
                 });
@@ -4326,7 +4297,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 profileForm.append('user_id', userId);
                 profileForm.append('resume_text', currentResume);
                 
-                const profileRes = await fetch('/user-profile/create', {
+                const profileRes = await fetch(API_BASE + '/user-profile/create', {
                     method: 'POST',
                     body: profileForm
                 });
@@ -4348,7 +4319,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 showToast('📧 正在读取邮件并智能筛选...');
                 
-                const processRes = await fetch('/jobs/process-email-batch', {
+                const processRes = await fetch(API_BASE + '/jobs/process-email-batch', {
                     method: 'POST',
                     body: processForm
                 });
@@ -4526,7 +4497,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             try {
                 const formData = new FormData();
                 formData.append('resume_text', text);
-                const res = await fetch('/extract/resume', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/resume', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderExtractProfile(data.profile);
@@ -4617,7 +4588,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('resume_text', text);
                 formData.append('job', JSON.stringify(jobData));
-                const res = await fetch('/extract/match', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/match', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderMatchResult(data.match, jobData);
@@ -4695,7 +4666,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
             showToast('📚 正在为您匹配学习资源...');
             try {
-                const res = await fetch('/learning/recommend', {
+                const res = await fetch(API_BASE + '/learning/recommend', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ missing_skills: missingSkills, job_title: jobTitle })
@@ -4807,7 +4778,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('resume_text', text);
                 formData.append('jobs', JSON.stringify(savedJobs));
                 formData.append('min_score', '30');
-                const res = await fetch('/extract/batch-match', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/extract/batch-match', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderBatchMatchResults(data.ranked_jobs);
@@ -4870,7 +4841,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                     priority: priority,
                     notes: notes
                 }));
-                const res = await fetch('/tracker/add', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/add', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast('✅ 申请记录已添加！');
@@ -4887,7 +4858,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const userId = getSessionUserId();
             const status = document.getElementById('trackerFilterStatus').value;
             try {
-                const res = await fetch(`/tracker/list/${userId}?status=${status}`);
+                const res = await fetch(API_BASE + `/tracker/list/${userId}?status=${status}`);
                 const data = await res.json();
                 if (data.success) {
                     renderTrackerList(data.applications);
@@ -4966,7 +4937,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('user_id', userId);
                 formData.append('application_id', appId);
                 formData.append('new_status', newStatus);
-                const res = await fetch('/tracker/update-status', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/update-status', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast(`✅ 状态已更新为：${statusMap(newStatus)}`);
@@ -4983,7 +4954,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('user_id', userId);
                 formData.append('application_id', appId);
                 formData.append('new_status', newStatus);
-                const res = await fetch('/tracker/update-status', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/tracker/update-status', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     showToast(`✅ 已更新为：${statusMap(newStatus)}`);
@@ -4996,7 +4967,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         async function loadTrackerStats() {
             const userId = getSessionUserId();
             try {
-                const res = await fetch(`/tracker/stats/${userId}`);
+                const res = await fetch(API_BASE + `/tracker/stats/${userId}`);
                 const data = await res.json();
                 if (data.success) {
                     renderTrackerStats(data.stats);
@@ -5273,7 +5244,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             try {
                 const userId = getSessionUserId();
-                const response = await fetch('/api/feedback', {
+                const response = await fetch(API_BASE + '/api/feedback', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, email, type, content })
@@ -5385,8 +5356,8 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const userId = getSessionUserId();
             try {
                 const [plansRes, subRes] = await Promise.all([
-                    fetch('/payment/plans'),
-                    fetch(`/payment/subscription/${userId}`)
+                    fetch(API_BASE + '/payment/plans'),
+                    fetch(API_BASE + `/payment/subscription/${userId}`)
                 ]);
                 const plansData = await plansRes.json();
                 const subData = await subRes.json();
@@ -5457,13 +5428,13 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const formData = new FormData();
                 formData.append('plan_id', planId);
                 formData.append('user_id', userId);
-                const res = await fetch('/payment/create-checkout', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/payment/create-checkout', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     if (data.demo_mode) {
                         // Demo模式：直接激活
                         showToast('⚠️ Demo模式：直接激活订阅（需配置真实Stripe Key）');
-                        const activateRes = await fetch('/payment/activate-demo', {
+                        const activateRes = await fetch(API_BASE + '/payment/activate-demo', {
                             method: 'POST',
                             body: new URLSearchParams({ plan_id: planId, user_id: userId })
                         });
@@ -5485,7 +5456,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             if (!confirm('确定要取消订阅吗？取消后您仍可使用到到期日。')) return;
             const userId = getSessionUserId();
             try {
-                const res = await fetch('/payment/cancel', {
+                const res = await fetch(API_BASE + '/payment/cancel', {
                     method: 'POST',
                     body: new URLSearchParams({ user_id: userId })
                 });
@@ -5524,7 +5495,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('company', company);
                 formData.append('job_description', jobDesc);
                 formData.append('resume_text', currentResume || '');
-                const res = await fetch('/cover-letter/check', { method: 'POST', body: formData });
+                const res = await fetch(API_BASE + '/cover-letter/check', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
                     renderCoverLetterQuality(data);
@@ -5706,7 +5677,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 
                 if (currentResume) {
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5716,7 +5687,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         })
                     );
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5735,7 +5706,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         url: ''
                     });
                     savePromises.push(
-                        fetch('/session/save-progress', {
+                        fetch(API_BASE + '/session/save-progress', {
                             method: 'POST',
                             body: new URLSearchParams({
                                 session_id: sessionId,
@@ -5756,7 +5727,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 formData.append('password', password || '');
                 formData.append('interested_position', interestedPosition);
                 
-                const response = await fetch('/session/register', {
+                const response = await fetch(API_BASE + '/session/register', {
                     method: 'POST',
                     body: formData
                 });
@@ -5859,7 +5830,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             };
             
             // 调用API
-            fetch('/api/learning/recommend', {
+            fetch(API_BASE + '/api/learning/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -6000,7 +5971,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             if (links.length === 0) return;
             
             try {
-                const response = await fetch('/api/learning/validate-links', {
+                const response = await fetch(API_BASE + '/api/learning/validate-links', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(links)
