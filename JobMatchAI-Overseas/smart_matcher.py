@@ -17,6 +17,50 @@ import hashlib
 
 
 @dataclass
+class ResumeHistoryEntry:
+    """简历版本历史条目"""
+    version: int
+    timestamp: str
+    resume_text: str  # 简历文本（完整）
+    polish_summary: str  # 精修总结
+    job_context: str  # 针对的职位
+    match_score: float  # 当时的匹配评分
+    skill_gaps: List[str]  # 当时的Skill Gap
+
+@dataclass
+class SkillGapEntry:
+    """Skill Gap历史记录"""
+    timestamp: str
+    job_title: str
+    job_description: str
+    resume_skills: List[str]
+    required_skills: List[str]
+    missing_skills: List[str]
+    match_score: float
+    learning_recommendations: List[Dict]  # [{skill, resource_url, status}]
+
+@dataclass  
+class ApplicationEntry:
+    """申请历史条目"""
+    timestamp: str
+    job_title: str
+    company: str
+    cover_letter: str
+    application_status: str  # pending/sent/interview/rejected/offer
+    interview_count: int = 0
+    notes: str = ""
+
+@dataclass
+class LearningRecord:
+    """学习资源浏览/完成记录"""
+    timestamp: str
+    skill: str
+    resource_title: str
+    resource_url: str
+    status: str  # viewed/completed/bookmarked
+    completion_percent: int = 0
+
+@dataclass
 class UserProfile:
     """用户画像 - 持续学习更新"""
     # 基础信息
@@ -48,12 +92,34 @@ class UserProfile:
     positive_keywords: List[str] = field(default_factory=list)  # 用户感兴趣的词
     negative_keywords: List[str] = field(default_factory=list)  # 用户不感兴趣的词
     
+    # ========== 新增：用户粘性增强功能 ==========
+    # 简历版本历史
+    resume_history: List[Dict] = field(default_factory=list)
+    
+    # Skill Gap历史追踪
+    skill_gap_history: List[Dict] = field(default_factory=list)
+    
+    # 申请历史
+    application_history: List[Dict] = field(default_factory=list)
+    
+    # 学习记录
+    learning_history: List[Dict] = field(default_factory=list)
+    
+    # 目标职位类型（用于个性化推荐）
+    target_job_types: List[str] = field(default_factory=list)
+    
+    # 最近一次分析时间
+    last_analysis_at: Optional[str] = None
+    
     def to_dict(self) -> Dict:
         return asdict(self)
     
     @classmethod
     def from_dict(cls, data: Dict) -> 'UserProfile':
-        return cls(**data)
+        # 过滤掉不存在的字段（向后兼容）
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered_data = {k: v for k, v in data.items() if k in valid_fields}
+        return cls(**filtered_data)
 
 
 class UserProfileManager:
@@ -89,7 +155,13 @@ class UserProfileManager:
             applied_jobs=[],
             ignored_jobs=[],
             positive_keywords=[],
-            negative_keywords=[]
+            negative_keywords=[],
+            resume_history=[],
+            skill_gap_history=[],
+            application_history=[],
+            learning_history=[],
+            target_job_types=[],
+            last_analysis_at=None
         )
         
         self._save_profile(profile)
@@ -287,6 +359,185 @@ class UserProfileManager:
         """生成职位唯一ID"""
         content = f"{job.get('title', '')}{job.get('company', '')}{job.get('description', '')[:100]}"
         return hashlib.md5(content.encode()).hexdigest()[:12]
+    
+    # ========== 用户粘性增强功能 ==========
+    
+    def add_resume_history(self, user_id: str, resume_text: str, polish_summary: str, 
+                          job_context: str, match_score: float, skill_gaps: List[str]) -> UserProfile:
+        """添加简历版本到历史记录"""
+        profile = self.get_profile(user_id)
+        if not profile:
+            profile = self.create_profile(user_id)
+        
+        # 计算版本号
+        version = len(profile.resume_history) + 1
+        
+        entry = {
+            'version': version,
+            'timestamp': datetime.now().isoformat(),
+            'resume_text': resume_text[:500] if resume_text else "",  # 保存前500字符
+            'polish_summary': polish_summary,
+            'job_context': job_context,
+            'match_score': match_score,
+            'skill_gaps': skill_gaps
+        }
+        
+        profile.resume_history.append(entry)
+        # 只保留最近10个版本
+        if len(profile.resume_history) > 10:
+            profile.resume_history = profile.resume_history[-10:]
+        
+        profile.last_analysis_at = datetime.now().isoformat()
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profile(profile)
+        
+        return profile
+    
+    def add_skill_gap(self, user_id: str, job_title: str, job_description: str,
+                     resume_skills: List[str], required_skills: List[str],
+                     missing_skills: List[str], match_score: float,
+                     learning_recommendations: List[Dict]) -> UserProfile:
+        """记录Skill Gap分析结果"""
+        profile = self.get_profile(user_id)
+        if not profile:
+            profile = self.create_profile(user_id)
+        
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'job_title': job_title,
+            'job_description': job_description[:200] if job_description else "",
+            'resume_skills': resume_skills,
+            'required_skills': required_skills,
+            'missing_skills': missing_skills,
+            'match_score': match_score,
+            'learning_recommendations': learning_recommendations
+        }
+        
+        profile.skill_gap_history.append(entry)
+        # 只保留最近20条记录
+        if len(profile.skill_gap_history) > 20:
+            profile.skill_gap_history = profile.skill_gap_history[-20:]
+        
+        # 更新目标职位类型
+        if job_title and job_title not in profile.target_job_types:
+            profile.target_job_types.append(job_title)
+        
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profile(profile)
+        
+        return profile
+    
+    def add_application(self, user_id: str, job_title: str, company: str,
+                        cover_letter: str, application_status: str = "sent") -> UserProfile:
+        """记录申请历史"""
+        profile = self.get_profile(user_id)
+        if not profile:
+            profile = self.create_profile(user_id)
+        
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'job_title': job_title,
+            'company': company,
+            'cover_letter': cover_letter[:500] if cover_letter else "",  # 保存前500字符
+            'application_status': application_status,
+            'interview_count': 0,
+            'notes': ''
+        }
+        
+        profile.application_history.append(entry)
+        # 只保留最近50条记录
+        if len(profile.application_history) > 50:
+            profile.application_history = profile.application_history[-50:]
+        
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profile(profile)
+        
+        return profile
+    
+    def update_application_status(self, user_id: str, index: int, status: str, 
+                                  interview_count: int = None, notes: str = None) -> UserProfile:
+        """更新申请状态"""
+        profile = self.get_profile(user_id)
+        if not profile or index >= len(profile.application_history):
+            return profile
+        
+        profile.application_history[index]['application_status'] = status
+        if interview_count is not None:
+            profile.application_history[index]['interview_count'] = interview_count
+        if notes is not None:
+            profile.application_history[index]['notes'] = notes
+        
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profile(profile)
+        
+        return profile
+    
+    def add_learning_record(self, user_id: str, skill: str, resource_title: str,
+                           resource_url: str, status: str = "viewed",
+                           completion_percent: int = 0) -> UserProfile:
+        """记录学习资源浏览/完成"""
+        profile = self.get_profile(user_id)
+        if not profile:
+            profile = self.create_profile(user_id)
+        
+        entry = {
+            'timestamp': datetime.now().isoformat(),
+            'skill': skill,
+            'resource_title': resource_title,
+            'resource_url': resource_url,
+            'status': status,
+            'completion_percent': completion_percent
+        }
+        
+        profile.learning_history.append(entry)
+        # 只保留最近100条记录
+        if len(profile.learning_history) > 100:
+            profile.learning_history = profile.learning_history[-100:]
+        
+        profile.updated_at = datetime.now().isoformat()
+        self._save_profile(profile)
+        
+        return profile
+    
+    def get_profile_summary(self, user_id: str) -> Dict:
+        """获取用户画像摘要（用于前端展示）"""
+        profile = self.get_profile(user_id)
+        if not profile:
+            return {'exists': False}
+        
+        # 计算Skill Gap改进趋势
+        gap_trend = []
+        if len(profile.skill_gap_history) >= 2:
+            recent_gaps = profile.skill_gap_history[-3:]
+            for gap in recent_gaps:
+                gap_trend.append({
+                    'timestamp': gap['timestamp'],
+                    'job_title': gap['job_title'],
+                    'match_score': gap['match_score'],
+                    'missing_skills_count': len(gap.get('missing_skills', []))
+                })
+        
+        # 计算申请成功率
+        total_applications = len(profile.application_history)
+        interviews = sum(1 for a in profile.application_history if a.get('interview_count', 0) > 0)
+        interview_rate = (interviews / total_applications * 100) if total_applications > 0 else 0
+        
+        return {
+            'exists': True,
+            'user_id': profile.user_id,
+            'created_at': profile.created_at,
+            'updated_at': profile.updated_at,
+            'skills_count': len(profile.skills),
+            'top_skills': list(profile.skills.keys())[:5],
+            'resume_versions': len(profile.resume_history),
+            'latest_match_score': profile.resume_history[-1]['match_score'] if profile.resume_history else None,
+            'gap_trend': gap_trend,
+            'total_applications': total_applications,
+            'interview_rate': round(interview_rate, 1),
+            'learning_completed': sum(1 for l in profile.learning_history if l.get('status') == 'completed'),
+            'target_jobs': profile.target_job_types[-5:],  # 最近5个目标职位
+            'last_analysis_at': profile.last_analysis_at
+        }
 
 
 class SmartJobMatcher:

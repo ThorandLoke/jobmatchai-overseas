@@ -5,7 +5,7 @@ JobMatchAI - 智能求职助手
 
 Copyright © 2026 JobMatchAI. All rights reserved.
 """
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import FastAPI, UploadFile, File, Form, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -17,9 +17,727 @@ import io
 import json
 import jwt
 import unicodedata
+import asyncio
+import threading
 
 # 学习推荐引擎
 from learning_recommendations import router as learning_router
+
+# ===== AI驱动的Skill Gap分析（完全由AI完成，不使用硬编码）=====
+
+def analyze_skill_gap_ai(resume_text: str, job_description: str, job_title: str = '', detected_skills: List[str] = None, lang: str = 'en') -> Dict:
+    """
+    使用AI分析简历与职位的技能差距
+    完全由AI驱动，不使用硬编码关键词匹配
+    """
+    if not AI_AVAILABLE:
+        return {
+            'missing_skills': [],
+            'matched_skills': detected_skills or [],
+            'critical_gaps': [],
+            'score': 50,
+            'reasoning': 'AI unavailable'
+        }
+    
+    try:
+        # 构建简历技能列表（用于上下文）
+        resume_skills_str = ', '.join(detected_skills) if detected_skills else '从简历内容中提取'
+        
+        prompts = {
+            'en': f"""You are an expert technical recruiter. Analyze the skill gap between this resume and job description.
+
+JOB TITLE: {job_title if job_title else 'Not specified'}
+
+JOB DESCRIPTION:
+{job_description[:2000]}
+
+RESUME SKILLS (extracted): {resume_skills_str}
+
+RESUME CONTENT:
+{resume_text[:2000]}
+
+Analyze thoroughly and return ONLY valid JSON:
+{{
+    "score": 数字(1-100, match score based on skill alignment),
+    "matched_skills": ["skills the resume has that match the job"],
+    "missing_skills": ["critical skills required by job but missing in resume - be specific and accurate, only list skills actually mentioned in job description"],
+    "critical_gaps": ["⚠️ MUST-HAVE requirements that will likely cause rejection if missing - focus on explicit requirements like certifications, degrees, years of experience, specific tools/technologies"],
+    "reasoning": "brief explanation of why these gaps matter for this specific role"
+}}
+
+CRITICAL RULES:
+1. Only list skills in missing_skills if they are EXPLICITLY mentioned in the job description
+2. Do NOT guess or hallucinate skills (e.g., do NOT list Power BI if job doesn't mention Power BI)
+3. Focus on what the job actually REQUIRES vs what would be nice to have
+4. Look for: specific tools named, certifications required, years of experience, language requirements""",
+            
+            'zh': f"""你是专业的技术招聘顾问。分析简历与职位的技能差距。
+
+职位名称：{job_title if job_title else '未指定'}
+
+职位描述：
+{job_description[:2000]}
+
+简历已检测技能：{resume_skills_str}
+
+简历内容：
+{resume_text[:2000]}
+
+仔细分析后返回JSON：
+{{
+    "score": 数字(1-100, 技能匹配度),
+    "matched_skills": ["简历中与职位匹配的技能"],
+    "missing_skills": ["职位明确要求但简历中缺少的技能 - 要准确，只列出职位描述中提到的技能"],
+    "critical_gaps": ["⚠️ 关键要求 - 缺失会导致被拒的硬性要求，如认证、学位、工作年限、特定工具],
+    "reasoning": "简要说明为什么这些差距对这个职位重要"
+}}
+
+关键规则：
+1. 只在 missing_skills 中列出职位描述中明确提到的技能
+2. 不要猜测或编造技能（如：职位没提Power BI就不要列）
+3. 关注职位实际要求的是什么 vs 最好有的
+4. 查找：明确提到的工具、需要的认证、工作年限要求、语言要求"""
+        }
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a job analyzer. Return ONLY valid JSON, no markdown, no explanation."},
+                {"role": "user", "content": prompts.get(lang, prompts['en'])}
+            ],
+            preferred_provider="groq",
+            temperature=0.1,
+            max_tokens=600
+        )
+        
+        content = response.choices[0].message.content.strip()
+        # 清理可能的markdown格式
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        result = json.loads(content)
+        
+        return {
+            'missing_skills': result.get('missing_skills', [])[:5],
+            'matched_skills': result.get('matched_skills', []),
+            'critical_gaps': result.get('critical_gaps', []),
+            'score': result.get('score', 50),
+            'reasoning': result.get('reasoning', '')
+        }
+        
+    except Exception as e:
+        print(f"AI Skill Gap analysis failed: {e}")
+        return {
+            'missing_skills': [],
+            'matched_skills': detected_skills or [],
+            'critical_gaps': [],
+            'score': 50,
+            'reasoning': f'Analysis failed: {str(e)}'
+        }
+
+
+# ===== AI驱动的职位分析函数 =====
+
+def identify_critical_requirements(job_description: str, resume_text: str, lang: str = 'en') -> List[str]:
+    """
+    使用AI分析职位描述，识别可能导致申请失败的关键要求
+    与简历对比，标记缺失的硬技能
+    """
+    if not AI_AVAILABLE:
+        # 后备：使用规则匹配
+        return identify_critical_requirements_fallback(job_description, resume_text, lang)
+    
+    try:
+        prompts = {
+            'zh': f"""你是一位专业的招聘顾问。请分析以下职位描述，识别所有关键要求，并与简历对比。
+
+职位描述：
+{job_description[:1500]}
+
+简历摘要：
+{resume_text[:500]}
+
+请返回JSON数组格式：
+{{"critical": ["关键要求1（必须满足否则极可能被拒）", "关键要求2"], "soft_skills": ["建议添加到简历的软技能1"]}}
+
+关键要求包括：
+1. 硬性技能要求（如：日语 fluency、特定软件认证、学位要求）
+2. 语言要求（如：日语 fluent、普通话 native）
+3. 工作经验年限要求
+4. 特定工具/软件要求
+
+请只返回JSON，不要其他文字。""",
+            'en': f"""You are a professional recruiter. Analyze this job description and identify ALL critical requirements, then compare with the resume.
+
+Job Description:
+{job_description[:1500]}
+
+Resume Summary:
+{resume_text[:500]}
+
+Return JSON array format:
+{{"critical": ["critical requirement 1 (may cause rejection if missing)", "critical requirement 2"], "soft_skills": ["soft skill to add to resume 1"]}}
+
+Critical requirements include:
+1. Hard skills (e.g., Japanese fluency, specific software certifications, degree)
+2. Language requirements (e.g., Japanese fluent, Mandarin native)
+3. Years of experience requirements
+4. Specific tools/software requirements
+
+Return ONLY JSON, no other text."""
+        }
+        
+        prompt = prompts.get(lang, prompts['en'])
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a professional job analyzer. Return only valid JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            preferred_provider="groq",
+            temperature=0.2,
+            max_tokens=500
+        )
+        
+        content = response.choices[0].message.content.strip()
+        # 清理可能的markdown格式
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        result = json.loads(content)
+        
+        critical_list = []
+        for req in result.get('critical', []):
+            # 标记为关键要求
+            if 'japanese' in req.lower() or '日语' in req:
+                critical_list.append(f"⚠️ {req} - 关键语言要求！")
+            elif 'language' in req.lower() or '语言' in req or 'fluent' in req.lower():
+                critical_list.append(f"⚠️ {req}")
+            elif 'modelling' in req.lower() or 'modeling' in req.lower() or 'simulation' in req.lower():
+                critical_list.append(f"⚠️ {req} - 关键技能要求！")
+            elif 'degree' in req.lower() or '学位' in req:
+                critical_list.append(f"📋 {req}")
+            else:
+                critical_list.append(f"⚠️ {req}")
+        
+        for skill in result.get('soft_skills', []):
+            critical_list.append(f"💬 {skill} - 建议添加到简历")
+        
+        return critical_list
+        
+    except Exception as e:
+        print(f"Critical requirements analysis failed: {e}")
+        return identify_critical_requirements_fallback(job_description, resume_text, lang)
+
+
+def identify_critical_requirements_fallback(job_description: str, resume_text: str, lang: str = 'en') -> List[str]:
+    """后备：使用规则匹配识别关键要求"""
+    job_lower = job_description.lower()
+    resume_lower = resume_text.lower()
+    critical = []
+    
+    # 语言要求
+    languages = {
+        'japanese': '日语 (Japanese)', 'japan': '日语',
+        'mandarin': '普通话 (Mandarin)', 'english': '英语 (English)',
+        'danish': '丹麦语 (Danish)', 'chinese': '中文 (Chinese)',
+        'german': '德语 (German)', 'french': '法语 (French)'
+    }
+    for lang_key, lang_name in languages.items():
+        if lang_key in job_lower:
+            context_start = max(0, job_lower.find(lang_key) - 50)
+            context = job_lower[context_start:context_start + 100]
+            if any(w in context for w in ['fluent', 'native', 'proficient', 'communicate']):
+                if lang_key not in resume_lower:
+                    critical.append(f"⚠️ {lang_name} - 关键语言要求！")
+    
+    # 建模/仿真工具
+    if any(kw in job_lower for kw in ['modelling', 'modeling', 'simulation', 'simulations']):
+        if 'modelling' not in resume_lower and 'modeling' not in resume_lower and 'simulation' not in resume_lower:
+            critical.append("⚠️ 建模与仿真工具 - 关键技能要求！")
+    
+    # 学位要求
+    if 'degree level' in job_lower or 'equivalent' in job_lower:
+        critical.append("📋 学位要求 - 请确认学历符合")
+    
+    # 领导经验
+    if any(kw in job_lower for kw in ['leading teams', 'multidisciplinary', 'lead team']):
+        critical.append("💬 团队领导经验 - 建议在简历中强调")
+    
+    # 软技能建议
+    soft_skills = {
+        'communication': '沟通能力',
+        'relationships': '关系建立',
+        'stakeholder': '利益相关者管理'
+    }
+    for skill_key, skill_name in soft_skills.items():
+        if skill_key in job_lower:
+            if skill_key not in resume_lower:
+                critical.append(f"💬 {skill_name} - 建议添加到简历")
+    
+    return critical
+
+
+# ===== AI驱动的国内学习资源推荐 =====
+
+def get_chinese_learning_resources_ai(skills: List[str], lang: str = 'zh') -> List[Dict]:
+    """
+    使用AI根据技能列表动态获取国内学习资源
+    
+    Args:
+        skills: 需要学习的技能列表
+        lang: 语言偏好
+    
+    Returns:
+        国内学习资源列表（B站、中国大学MOOC）
+    """
+    if not skills:
+        return []
+    
+    if not AI_AVAILABLE:
+        return get_chinese_learning_resources_fallback(skills)
+    
+    skills_str = '、'.join(skills[:5])  # 最多5个技能
+    
+    prompt = f"""你需要为以下技能推荐B站学习资源。
+
+【目标技能】
+{skills_str}
+
+【重要规则 - 必须遵守！】
+1. 禁止推荐以下平台（课程经常下线/已下线）：
+   - 腾讯课堂
+   - 网易公开课
+   - 学堂在线（xuetangX）
+   - 中国大学MOOC（icourse163.org）
+   只使用B站搜索链接！
+
+【必须返回的URL格式 - B站搜索链接】
+https://search.bilibili.com/all?keyword=技能关键词
+
+例如：
+- 财务咨询技能 → https://search.bilibili.com/all?keyword=财务咨询教程
+- 客户沟通技能 → https://search.bilibili.com/all?keyword=客户沟通技巧
+
+【返回JSON格式】（只返回JSON，不要其他内容）：
+{{
+    "chinese_resources": [
+        {{
+            "skill": "技能中文名",
+            "title": "B站学习合集推荐（如：财务咨询系统性学习教程）",
+            "provider": "B站",
+            "url": "https://search.bilibili.com/all?keyword=技能关键词",
+            "duration": "自学时长",
+            "difficulty": "初级/中级/高级",
+            "type": "视频合集"
+        }}
+    ]
+}}
+
+【规则 - 严格遵守】
+1. 所有URL必须使用：https://search.bilibili.com/all?keyword=技能名
+2. 禁止返回任何具体课程页面URL（如 icourse163.org/xxx）
+3. 每个技能只推荐1个B站搜索链接
+4. 技能名称用中文，标题描述要具体
+5. 只返回JSON，不要任何解释文字！"""
+
+    try:
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that returns ONLY valid JSON. No markdown, no explanations, no text outside the JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            preferred_provider="groq",
+            temperature=0.3,
+            max_tokens=1200
+        )
+        
+        content = response.choices[0].message.content.strip()
+        # 清理可能的markdown包装
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        result = json.loads(content)
+        chinese_resources = result.get('chinese_resources', [])
+        
+        # 格式化返回
+        formatted = []
+        for r in chinese_resources[:5]:
+            formatted.append({
+                'skill': r.get('skill', ''),
+                'title': r.get('title', ''),
+                'provider': r.get('provider', ''),
+                'url': r.get('url', ''),
+                'duration': r.get('duration', ''),
+                'difficulty': r.get('difficulty', ''),
+                'type': r.get('type', '视频课程'),
+                'relevance': f"与「{r.get('skill', '')}」相关的中文学习资源"
+            })
+        
+        return formatted
+        
+    except Exception as e:
+        print(f"AI Chinese learning resources failed: {e}")
+        return get_chinese_learning_resources_fallback(skills)
+
+
+def get_chinese_learning_resources_fallback(skills: List[str]) -> List[Dict]:
+    """后备：使用B站搜索链接获取国内学习资源（不包含具体课程页URL）"""
+    results = []
+    
+    # 只使用B站搜索链接，避免课程下线问题
+    bilibili_base = "https://search.bilibili.com/all?keyword="
+    
+    for skill in skills[:5]:
+        results.append({
+            'skill': skill,
+            'title': f'{skill} - B站视频合集',
+            'provider': 'B站',
+            'url': f'{bilibili_base}{skill}',
+            'duration': '视频合集',
+            'difficulty': '各水平',
+            'type': '视频课程',
+            'relevance': f'在B站搜索"{skill}"相关视频'
+        })
+    
+    return results[:5]
+
+def recommend_learning_resources(
+    resume_structure: Dict,
+    job_description: str,
+    skill_gap: Dict,
+    lang: str = 'en'
+) -> Dict:
+    """
+    使用AI根据简历结构和技能差距推荐个性化学习资源
+    
+    Args:
+        resume_structure: 解析后的简历结构化数据
+        job_description: 职位描述
+        skill_gap: 技能差距分析结果
+        lang: 语言 (zh/en)
+    
+    Returns:
+        学习资源推荐，包含免费和付费资源，以及国内资源
+    """
+    if not AI_AVAILABLE:
+        return recommend_learning_resources_fallback(skill_gap, lang)
+    
+    try:
+        # 提取简历中的技能和教育背景
+        resume_skills = resume_structure.get('skills', {})
+        technical_skills = resume_skills.get('technical', [])
+        soft_skills = resume_skills.get('soft', [])
+        education = resume_structure.get('education', [])
+        total_years = resume_structure.get('total_experience_years', 0)
+        
+        # 获取缺失的技能
+        missing_skills = skill_gap.get('missing_skills', [])
+        critical_gaps = skill_gap.get('critical_gaps', [])
+        matched_skills = skill_gap.get('matched_skills', [])
+        
+        # 构建上下文
+        education_str = ', '.join([
+            f"{e.get('degree', '')} {e.get('field', '')} at {e.get('school', '')}"
+            for e in education[:2]
+        ]) if education else 'Not specified'
+        
+        # 中文prompt - 优化
+        missing_skills_str = '、'.join(missing_skills[:5]) if missing_skills else '无'
+        critical_gaps_str = '、'.join(critical_gaps[:3]) if critical_gaps else '无'
+        
+        prompt_zh = f"""你是一名专业的职业发展顾问。为候选人推荐个性化学习资源，帮助他们弥补技能差距。
+
+【候选人背景】
+- 学历：{education_str}
+- 工作经验：{total_years}年
+- 已掌握技能：{'、'.join(technical_skills[:10]) if technical_skills else '未指定'}
+
+【目标职位】
+{skill_gap.get('job_title', '目标职位')}
+
+【职位要求摘要】
+{job_description[:1000]}
+
+【需要提升的技能】
+缺失技能：{missing_skills_str}
+关键差距：{critical_gaps_str}
+
+请返回JSON格式推荐（只返回JSON，不要其他内容）：
+{{
+    "summary": "用1-2句话说明推荐理由，中文，简洁",
+    "free_resources": [
+        {{
+            "skill": "对应的技能名称（中文）",
+            "title": "课程名称（英文原名保留）",
+            "type": "课程/视频/文档",
+            "provider": "平台名称，如Coursera/edX/Udemy等",
+            "url": "使用平台搜索页面或官方学习路径页面URL，例如：https://www.coursera.org/search?query=关键词 或 https://learn.microsoft.com/zh-cn/技能名",
+            "duration": "预计学习时长，如8小时、4周",
+            "difficulty": "初级/中级/高级",
+            "relevance": "一句话说明为什么这个资源有用（中文）"
+        }}
+    ],
+    "paid_resources": [
+        {{
+            "skill": "对应的技能名称",
+            "title": "课程名称",
+            "type": "课程/认证",
+            "provider": "平台名称",
+            "url": "使用平台主页或课程列表页URL",
+            "duration": "学习时长",
+            "cost": "费用估算",
+            "value_proposition": "付费价值说明（中文）"
+        }}
+    ],
+    "quick_wins": ["更新LinkedIn技能标签", "搜索目标公司员工获取 Insights", "准备STAR法则面试案例"]
+}}
+
+【重要规则】
+1. 所有返回内容必须使用中文
+2. 只推荐与职位要求直接相关的技能资源
+3. 优先选择知名平台（Coursera、edX、Udemy、LinkedIn Learning、Microsoft Learn）的免费课程
+4. URL必须使用平台搜索页或官方学习路径页，不要使用具体课程页面URL
+5. 免费资源3-5个，付费资源0-2个
+6. quick_wins必须是纯中文的可执行行动建议，禁止包含英文单词或短语
+        """
+        prompt_en = f"""You are a professional career advisor. Recommend personalized learning resources to help the candidate address skill gaps.
+
+CANDIDATE PROFILE:
+- Education: {education_str}
+- Experience: {total_years} years
+- Current Skills: {', '.join(technical_skills[:10]) if technical_skills else 'Not specified'}
+
+JOB TITLE: {skill_gap.get('job_title', 'Target Position')}
+
+JOB REQUIREMENTS:
+{job_description[:1000]}
+
+SKILL GAPS TO ADDRESS:
+- Missing: {', '.join(missing_skills[:5]) if missing_skills else 'None'}
+- Critical: {', '.join(critical_gaps[:3]) if critical_gaps else 'None'}
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+    "summary": "1-2 sentences explaining the recommendation rationale",
+    "free_resources": [
+        {{
+            "skill": "Skill name",
+            "title": "Course name (keep original English name)",
+            "type": "course/video/docs",
+            "provider": "Platform (Coursera/edX/Udemy/LinkedIn Learning)",
+            "url": "ACTUAL accessible course URL (DO NOT make up links)",
+            "duration": "Time needed",
+            "difficulty": "beginner/intermediate/advanced",
+            "relevance": "Why this helps"
+        }}
+    ],
+    "paid_resources": [
+        {{
+            "skill": "Skill name",
+            "title": "Course name",
+            "provider": "Platform",
+            "url": "Course URL",
+            "duration": "Time needed",
+            "cost": "Cost estimate",
+            "value_proposition": "Why worth it"
+        }}
+    ],
+    "quick_wins": ["Quick action 1", "Quick action 2"]
+}}
+
+CRITICAL RULES:
+1. Only recommend for skills MENTIONED in job requirements
+2. Prioritize well-known platforms (Coursera, edX, Udemy, LinkedIn Learning)
+3. ALWAYS use platform search page URLs or official learning path URLs - NEVER use specific course page URLs (they expire)
+   - Coursera: https://www.coursera.org/search?query=skill_name
+   - Udemy: https://www.udemy.com/topic/skill_name/
+   - LinkedIn Learning: https://www.linkedin.com/learning/topics/skill_name
+   - Microsoft Learn: https://learn.microsoft.com/en-us/training/
+4. Return 3-5 free resources, 0-2 paid resources"""
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a learning resource curator. Return ONLY valid JSON, no markdown, no explanation. NEVER make up URLs - only provide links you are confident exist."},
+                {"role": "user", "content": prompt_zh if lang == 'zh' else prompt_en}
+            ],
+            preferred_provider="groq",
+            temperature=0.3,
+            max_tokens=2000
+        )
+        
+        content = response.choices[0].message.content.strip()
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        result = json.loads(content)
+        
+        # 获取国内学习资源（AI驱动）
+        chinese_resources = get_chinese_learning_resources_ai(missing_skills, lang)
+        
+        return {
+            'success': True,
+            'summary': result.get('summary', ''),
+            'free_resources': result.get('free_resources', [])[:5],
+            'paid_resources': result.get('paid_resources', [])[:3],
+            'chinese_resources': chinese_resources,  # 新增国内资源
+            'quick_wins': result.get('quick_wins', []),
+            'skill_gaps_addressed': missing_skills[:5]
+        }
+        
+    except Exception as e:
+        print(f"AI Learning recommendation failed: {e}")
+        return recommend_learning_resources_fallback(skill_gap, lang)
+
+
+def recommend_learning_resources_fallback(skill_gap: Dict, lang: str = 'en') -> Dict:
+    """后备：使用硬编码的通用学习资源"""
+    missing_skills = skill_gap.get('missing_skills', [])
+    
+    # 通用免费资源
+    generic_free = [
+        {
+            "skill": "General",
+            "title": "Coursera Free Courses",
+            "type": "course",
+            "provider": "Coursera",
+            "url": "https://www.coursera.org/search",
+            "duration": "Varies",
+            "difficulty": "beginner",
+            "relevance": "Wide range of professional courses"
+        },
+        {
+            "skill": "General",
+            "title": "LinkedIn Learning",
+            "type": "video",
+            "provider": "LinkedIn",
+            "url": "https://www.linkedin.com/learning/",
+            "duration": "Self-paced",
+            "difficulty": "all levels",
+            "relevance": "Professional development courses"
+        },
+        {
+            "skill": "Technical",
+            "title": "MDN Web Docs",
+            "type": "documentation",
+            "provider": "Mozilla",
+            "url": "https://developer.mozilla.org/",
+            "duration": "Self-paced",
+            "difficulty": "all levels",
+            "relevance": "Web development documentation"
+        }
+    ]
+    
+    return {
+        'success': False,
+        'summary': 'AI unavailable. Showing general resources.',
+        'free_resources': generic_free,
+        'paid_resources': [],
+        'quick_wins': ['Add missing keywords to resume', 'Quantify achievements'],
+        'priority_order': missing_skills[:5] if missing_skills else ['Update your skills section'],
+        'skill_gaps_addressed': missing_skills[:5]
+    }
+
+
+def extract_required_skills_from_job(job_description: str, lang: str = 'en') -> List[str]:
+    """从职位描述中提取所有要求的技术技能"""
+    if not AI_AVAILABLE:
+        return extract_required_skills_fallback(job_description, lang)
+    
+    try:
+        prompts = {
+            'zh': f"""从以下职位描述中提取所有要求的技能和资格。
+
+职位描述：
+{job_description[:1500]}
+
+请以JSON数组格式返回技能列表：
+["技能1", "技能2", ...]
+
+只返回技能名称，不要其他文字。""",
+            'en': f"""Extract ALL required skills and qualifications from this job description.
+
+Job Description:
+{job_description[:1500]}
+
+Return JSON array of skills:
+["skill 1", "skill 2", ...]
+
+Return ONLY JSON array, no other text."""
+        }
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a job analyzer. Return only valid JSON array."},
+                {"role": "user", "content": prompts.get(lang, prompts['en'])}
+            ],
+            preferred_provider="groq",
+            temperature=0.1,
+            max_tokens=300
+        )
+        
+        content = response.choices[0].message.content.strip()
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        return json.loads(content)
+        
+    except Exception as e:
+        print(f"Skill extraction failed: {e}")
+        return extract_required_skills_fallback(job_description, lang)
+
+
+def extract_required_skills_fallback(job_description: str, lang: str = 'en') -> List[str]:
+    """后备：使用规则提取技能"""
+    job_lower = job_description.lower()
+    skills = []
+    found = set()
+    
+    skill_patterns = {
+        'Excel': ['excel'],
+        'PowerPoint': ['powerpoint', 'power point'],
+        'Power BI': ['power bi'],
+        'Microsoft Copilot': ['copilot'],
+        'Microsoft 365': ['microsoft 365', 'm365'],
+        'Azure AI': ['azure ai', 'azure cognitive'],
+        'AI Agent': ['ai agent', 'agentic'],
+        'Machine Learning': ['machine learning', 'ml/ai', 'machine-learning'],
+        'Pre-sales': ['pre-sales', 'presales'],
+        'Technical Consulting': ['technical consulting'],
+        'Solution Design': ['solution design'],
+        'SQL': ['sql', 'mysql', 'postgresql'],
+        'Python': ['python'],
+        'ERP': ['erp', 'netsuite', 'dynamics', 'sap'],
+        'Java': ['java'],
+        'JavaScript': ['javascript'],
+        'Tableau': ['tableau'],
+        '建模': ['modelling', 'modeling'],
+        '仿真': ['simulation', 'simulations'],
+        '供应链': ['supply chain', 'SCM'],
+        '财务': ['finance', 'financial', 'accounting'],
+        '咨询': ['consulting', 'advisory'],
+        '战略': ['strategy', 'strategic'],
+        '项目管理': ['project management'],
+        '数据分析': ['data analysis', 'analytics'],
+    }
+    
+    for skill_name, patterns in skill_patterns.items():
+        for pattern in patterns:
+            if pattern in job_lower and skill_name.lower() not in found:
+                skills.append(skill_name)
+                found.add(skill_name.lower())
+                break
+    
+    return skills
 
 # AI 配置 - 质量优先：简历用GPT-4o，求职信用GPT-4o-mini
 # 首先尝试从 .env 文件加载环境变量
@@ -37,46 +755,221 @@ def load_env_file():
 # 加载 .env 文件
 load_env_file()
 
+# ===== 智能 AI 路由系统 =====
+# 优先级：Groq（免费）→ OpenAI（备用）→ Fallback
+
 try:
     from openai import OpenAI
+    
+    # AI 客户端和模型配置
     openai_api_key = os.getenv("OPENAI_API_KEY")
     groq_api_key = os.getenv("GROQ_API_KEY")
-
+    
+    # 两个客户端都初始化
+    openai_client = None
+    groq_client = None
+    
     if openai_api_key:
-        # 优先使用 OpenAI（质量优先策略）
-        ai_client = OpenAI(api_key=openai_api_key)
-        AI_PROVIDER = "openai"
-        AI_MODEL_RESUME = os.getenv("AI_MODEL_RESUME", "gpt-4o")
-        AI_MODEL_COVER = os.getenv("AI_MODEL_COVER", "gpt-4o-mini")
-        AI_MODEL = AI_MODEL_RESUME
-        print(f"✅ Using OpenAI API | Resume: {AI_MODEL_RESUME} | Cover: {AI_MODEL_COVER}")
-    elif groq_api_key:
-        # 备用：Groq 免费方案
-        ai_client = OpenAI(
+        openai_client = OpenAI(api_key=openai_api_key)
+        OPENAI_MODEL = os.getenv("AI_MODEL_RESUME", "gpt-4o-mini")
+        print(f"✅ [OpenAI] Ready | Model: {OPENAI_MODEL}")
+    
+    if groq_api_key:
+        groq_client = OpenAI(
             api_key=groq_api_key,
             base_url="https://api.groq.com/openai/v1"
         )
-        AI_PROVIDER = "groq"
-        AI_MODEL_RESUME = "llama-3.1-70b-versatile"
-        AI_MODEL_COVER = "llama-3.1-70b-versatile"
-        AI_MODEL = AI_MODEL_RESUME
-        print("✅ Using Groq API (Free tier)")
-    else:
-        ai_client = None
-        AI_PROVIDER = None
-        AI_MODEL_RESUME = None
-        AI_MODEL_COVER = None
-        AI_MODEL = None
+        GROQ_MODEL = "llama-3.3-70b-versatile"
+        print(f"✅ [Groq] Ready | Model: {GROQ_MODEL}")
+    
+    # 状态跟踪
+    GROQ_AVAILABLE = True  # 初始假设 Groq 可用
+    GROQ_COOLDOWN_UNTIL = 0  # Unix timestamp (0 = 无限制)
+    OPENAI_MODEL_CURRENT = OPENAI_MODEL if openai_client else None
+    
+    # 历史记录
+    AI_REQUEST_LOG = []  # 最近的请求记录，用于调试
+    
+    def smart_ai_request(messages: list, preferred_provider: str = "groq", 
+                          temperature: float = 0.1, max_tokens: int = 2000) -> dict:
+        """
+        智能 AI 请求路由
+        
+        策略：
+        1. 优先尝试 Groq（免费额度）
+        2. Groq 失败（429）时自动切换 OpenAI
+        3. 记录失败，下次跳过 Groq
+        
+        Args:
+            messages: OpenAI 格式的消息列表
+            preferred_provider: "groq" 或 "openai"
+            temperature: 温度参数
+            max_tokens: 最大 token 数
+        
+        Returns:
+            AI 响应对象
+        """
+        global GROQ_AVAILABLE, GROQ_COOLDOWN_UNTIL, AI_REQUEST_LOG
+        import time
+        
+        current_provider = "groq" if preferred_provider == "groq" else "openai"
+        models = {
+            "groq": (groq_client, GROQ_MODEL) if groq_client else None,
+            "openai": (openai_client, OPENAI_MODEL_CURRENT) if openai_client else None
+        }
+        
+        tried_groq = False
+        last_error = None
+        
+        # 尝试顺序：Groq → OpenAI
+        providers_to_try = []
+        if preferred_provider == "groq" and groq_client and GROQ_AVAILABLE:
+            if GROQ_COOLDOWN_UNTIL == 0 or time.time() >= GROQ_COOLDOWN_UNTIL:
+                providers_to_try = ["groq", "openai"]
+            else:
+                # Groq 在冷却中，直接用 OpenAI
+                providers_to_try = ["openai"]
+        else:
+            providers_to_try = ["openai"]
+        
+        for provider in providers_to_try:
+            client, model = models[provider]
+            if not client:
+                continue
+            
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                
+                # 成功！记录并返回
+                AI_REQUEST_LOG.append({
+                    "time": time.time(),
+                    "provider": provider,
+                    "model": model,
+                    "success": True
+                })
+                if len(AI_REQUEST_LOG) > 20:
+                    AI_REQUEST_LOG.pop(0)
+                
+                return response
+                
+            except Exception as e:
+                error_str = str(e)
+                last_error = error_str
+                
+                if "429" in error_str or "rate_limit" in error_str.lower():
+                    # Groq 配额用完
+                    if provider == "groq":
+                        GROQ_AVAILABLE = False
+                        # 从错误信息中提取恢复时间
+                        import re
+                        match = re.search(r'try again in ([\d]+)h?(\d+)m?(\d+\.\d+)s?', error_str)
+                        if match:
+                            hours = int(match.group(1)) if match.group(1) else 0
+                            mins = int(match.group(2)) if match.group(2) else 0
+                            secs = float(match.group(3)) if match.group(3) else 0
+                            GROQ_COOLDOWN_UNTIL = time.time() + hours*3600 + mins*60 + secs + 60
+                            print(f"⚠️ Groq 配额用完，切换到 OpenAI。预计恢复: {hours}h {mins}m后")
+                        else:
+                            GROQ_COOLDOWN_UNTIL = time.time() + 3600  # 默认1小时
+                            print(f"⚠️ Groq 配额用完，切换到 OpenAI。预计1小时后恢复")
+                        continue  # 尝试 OpenAI
+                
+                # 其他错误，记录并继续尝试下一个 provider
+                print(f"⚠️ {provider.upper()} 请求失败: {error_str[:100]}")
+                continue
+        
+        # 全部失败，返回模拟错误
+        class FakeError:
+            choices = [type('obj', (object,), {'message': type('obj', (object,), {
+                'content': f'AI service unavailable. Last error: {last_error}'
+            })()})()]
+            error = last_error
+        return FakeError()
+    
+    def check_groq_recovery() -> bool:
+        """
+        检测 Groq 配额是否恢复
+        每5分钟自动调用
+        """
+        global GROQ_AVAILABLE, GROQ_COOLDOWN_UNTIL
+        import time
+        
+        if not groq_client or not groq_api_key:
+            return False
+        
+        if GROQ_COOLDOWN_UNTIL > 0 and time.time() < GROQ_COOLDOWN_UNTIL:
+            return False  # 还在冷却中
+        
+        # 测试 Groq 是否可用
+        try:
+            test_response = groq_client.chat.completions.create(
+                model=GROQ_MODEL,
+                messages=[{"role": "user", "content": "Hi"}],
+                max_tokens=5
+            )
+            GROQ_AVAILABLE = True
+            GROQ_COOLDOWN_UNTIL = 0
+            print(f"✅ Groq 配额已恢复！")
+            return True
+        except Exception as e:
+            if "429" in str(e):
+                GROQ_AVAILABLE = False
+            return False
+    
+    def get_ai_status() -> dict:
+        """获取当前 AI 状态"""
+        import time
+        return {
+            "groq_available": GROQ_AVAILABLE,
+            "groq_cooldown_until": GROQ_COOLDOWN_UNTIL if not GROQ_AVAILABLE else 0,
+            "groq_cooldown_remaining": max(0, int(GROQ_COOLDOWN_UNTIL - time.time())) if GROQ_COOLDOWN_UNTIL > time.time() else 0,
+            "openai_available": openai_client is not None,
+            "active_provider": "groq" if GROQ_AVAILABLE and groq_client else "openai"
+        }
+    
+    # 兼容旧代码
+    ai_client = groq_client if groq_client else openai_client
+    AI_PROVIDER = "groq" if groq_client else ("openai" if openai_client else None)
+    AI_MODEL_RESUME = GROQ_MODEL if groq_client else OPENAI_MODEL
+    AI_MODEL_COVER = AI_MODEL_RESUME
+    AI_MODEL = AI_MODEL_RESUME
+    AI_AVAILABLE = groq_client is not None or openai_client is not None
+    
+    if not groq_client and not openai_client:
         print("⚠️ No AI API key found, using fallback mode")
-
-    AI_AVAILABLE = AI_PROVIDER is not None
+    elif groq_client and openai_client:
+        print(f"✅ [Smart Router] Groq (优先) + OpenAI (备用)")
+    elif groq_client:
+        print(f"✅ Using Groq API (Free) | Model: {GROQ_MODEL}")
+    else:
+        print(f"✅ Using OpenAI API | Model: {OPENAI_MODEL}")
+        
 except Exception as e:
+    print(f"⚠️ AI client init failed: {e}, using fallback mode")
     AI_AVAILABLE = False
     AI_PROVIDER = None
     AI_MODEL_RESUME = None
     AI_MODEL_COVER = None
     AI_MODEL = None
-    print(f"⚠️ AI client init failed: {e}, using fallback mode")
+    groq_client = None
+    openai_client = None
+    GROQ_AVAILABLE = False
+    
+    def smart_ai_request(*args, **kwargs):
+        class FakeError:
+            choices = [type('obj', (object,), {'message': type('obj', (object,), {'content': 'AI unavailable'})()})()]
+        return FakeError()
+    
+    def check_groq_recovery():
+        return False
+    
+    def get_ai_status():
+        return {"groq_available": False, "openai_available": False}
 
 app = FastAPI(title="JobMatchAI Nordic API", version="2.0.0")
 
@@ -233,6 +1126,256 @@ def detect_language(text: str) -> str:
     # 默认英文（英语简历最常见）
     return 'en'
 
+# === 简历结构化解析（AI驱动） ===
+def parse_resume_structure(text: str, lang: str = 'en') -> Dict:
+    """使用 AI 将简历解析为结构化数据
+    
+    Args:
+        text: 简历文本（原始文本，来自 PDF/DOCX 提取）
+        lang: 语言代码 (zh/en/da)
+    
+    Returns:
+        结构化简历数据，包含：
+        - personal: 基本信息（姓名、邮箱、电话）
+        - education: 教育经历列表
+        - experience: 工作经历列表（带年份计算）
+        - skills: 技能分类（technical/soft/language）
+        - total_experience_years: 总工作年限
+    """
+    if not AI_AVAILABLE:
+        return parse_resume_structure_fallback(text, lang)
+    
+    prompts = {
+        'zh': f"""你是一位专业的简历解析专家。请将以下简历文本解析为结构化JSON数据。
+
+【严格规则】
+1. 只从简历文本中提取信息，禁止编造任何内容
+2. 教育经历要识别学位类型（博士/硕士/学士/专科）和学校名称
+3. 工作经历要识别公司、职位、时间范围，并计算精确年限
+4. 技能要分类为 technical（技术技能）、soft（软技能）、language（语言能力）
+5. 如果无法从文本中确定某个字段，返回空字符串或空数组
+6. 工作经验从最早的工作开始算起
+
+【输出格式 - 必须严格返回有效JSON】
+{{
+  "personal": {{
+    "name": "姓名（从简历中提取）",
+    "email": "邮箱",
+    "phone": "电话"
+  }},
+  "education": [
+    {{
+      "degree": "学位类型（博士/硕士/学士/专科/其他）",
+      "field": "专业",
+      "school": "学校名称",
+      "year": 年份数字,
+      "country": "国家（如果能从简历中识别）"
+    }}
+  ],
+  "experience": [
+    {{
+      "company": "公司名称",
+      "role": "职位/头衔",
+      "start": "开始时间（YYYY-MM格式，没有就留空）",
+      "end": "结束时间（YYYY-MM或ongoing）",
+      "years": 工作年限（数字，保留一位小数）,
+      "duties": ["职责1", "职责2"]
+    }}
+  ],
+  "skills": {{
+    "technical": ["技术技能1", "技能2"],
+    "soft": ["软技能1", "技能2"],
+    "language": ["语言能力1（含等级）", "语言能力2"]
+  }},
+  "total_experience_years": 总工作年限（数字，保留一位小数）
+}}
+
+简历文本：
+{text[:5000]}""",
+        'en': f"""You are a professional resume parser. Parse the following resume text into structured JSON data.
+
+【Strict Rules】
+1. Extract ONLY from the resume text - do NOT fabricate any information
+2. Identify degree types: PhD, Master's, Bachelor's, Associate, Diploma, Other
+3. Work experience: identify company, role, date range, calculate precise years
+4. Skills must be categorized as: technical (tools/languages), soft (interpersonal), language (with proficiency level)
+5. If a field cannot be determined from the text, return empty string or empty array
+6. Experience should start from the earliest job
+
+【Output Format - Return valid JSON only】
+{{
+  "personal": {{
+    "name": "Full name from resume",
+    "email": "Email address",
+    "phone": "Phone number"
+  }},
+  "education": [
+    {{
+      "degree": "PhD/Master's/Bachelor's/Associate/Diploma/Other",
+      "field": "Field of study",
+      "school": "University name",
+      "year": year_number,
+      "country": "Country (if identifiable from resume)"
+    }}
+  ],
+  "experience": [
+    {{
+      "company": "Company name",
+      "role": "Job title",
+      "start": "Start date (YYYY-MM, empty if not found)",
+      "end": "End date (YYYY-MM or 'ongoing')",
+      "years": years_worked (number, one decimal),
+      "duties": ["Duty 1", "Duty 2"]
+    }}
+  ],
+  "skills": {{
+    "technical": ["Technical skill 1", "Skill 2"],
+    "soft": ["Soft skill 1", "Skill 2"],
+    "language": ["Language (proficiency)", "Language 2"]
+  }},
+  "total_experience_years": total_years (number, one decimal)
+}}
+
+Resume text:
+{text[:5000]}""",
+        'da': f"""Du er en professionel CV-parser. Parse den følgende CV-tekst til struktureret JSON-data.
+
+【Strenge regler】
+1. Udtræk KUN fra CV-teksten - fabricate IKKE nogen information
+2. Identificer gradstyper: PhD, Kandidat, Bachelor, Professionsbachelor, Andet
+3. Arbejdserfaring: identificer virksomhed, stilling, datointerval, beregn præcise år
+4. Kompetencer skal kategoriseres som: technical (værktøjer/sprog), soft (interpersonlig), language (med niveau)
+5. Hvis et felt ikke kan bestemmes fra teksten, returner tom streng eller tom array
+6. Erfaring skal starte fra det tidligste job
+
+【Output Format - Returner kun gyldig JSON】
+{{
+  "personal": {{
+    "name": "Fulde navn fra CV",
+    "email": "E-mailadresse",
+    "phone": "Telefonnummer"
+  }},
+  "education": [
+    {{
+      "degree": "PhD/Kandidat/Bachelor/Professionsbachelor/Andet",
+      "field": "Studieretning",
+      "school": "Universitetsnavn",
+      "year": årstal,
+      "country": "Land (hvis identificerbart)"
+    }}
+  ],
+  "experience": [
+    {{
+      "company": "Virksomhedsnavn",
+      "role": "Stilling",
+      "start": "Startdato (YYYY-MM, tom hvis ikke fundet)",
+      "end": "Slutdato (YYYY-MM eller 'i gang')",
+      "years": arbejdsår (tal, én decimal),
+      "duties": ["Pligt 1", "Pligt 2"]
+    }}
+  ],
+  "skills": {{
+    "technical": ["Teknisk kompetence 1", "Kompetence 2"],
+    "soft": ["Blød kompetence 1", "Kompetence 2"],
+    "language": ["Sprog (niveau)", "Sprog 2"]
+  }},
+  "total_experience_years": samlede_år (tal, én decimal)
+}}
+
+CV tekst:
+{text[:5000]}"""
+    }
+    
+    try:
+        prompt = prompts.get(lang, prompts['en'])
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "You are a professional resume parser. Return ONLY valid JSON, no markdown, no explanation."},
+                {"role": "user", "content": prompt}
+            ],
+            preferred_provider="groq",
+            temperature=0.1,  # 低温度确保一致性
+            max_tokens=2500
+        )
+        
+        # 清理响应中的 markdown 代码块
+        raw_content = response.choices[0].message.content.strip()
+        # 移除 ```json 和 ``` 标记
+        if raw_content.startswith('```json'):
+            raw_content = raw_content[7:]
+        elif raw_content.startswith('```'):
+            raw_content = raw_content[3:]
+        if raw_content.endswith('```'):
+            raw_content = raw_content[:-3]
+        raw_content = raw_content.strip()
+        
+        result = json.loads(raw_content)
+        
+        # 处理 AI 返回数组或嵌套在 resumes 键中的情况
+        if isinstance(result, list):
+            result = result[0] if result else {}
+        elif 'resumes' in result:
+            result = result['resumes'][0] if result['resumes'] else {}
+        elif 'resume' in result:
+            result = result['resume'] if isinstance(result['resume'], dict) else {}
+        
+        # 确保有必要的字段
+        if 'personal' not in result:
+            result['personal'] = {}
+        if 'education' not in result:
+            result['education'] = []
+        if 'experience' not in result:
+            result['experience'] = []
+        if 'skills' not in result:
+            result['skills'] = {'technical': [], 'soft': [], 'language': []}
+        
+        result['detected_language'] = lang
+        result['ai_enhanced'] = True
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parse failed: {e}")
+        return parse_resume_structure_fallback(text, lang)
+    except Exception as e:
+        print(f"AI parse failed: {e}, using fallback")
+        return parse_resume_structure_fallback(text, lang)
+
+
+def parse_resume_structure_fallback(text: str, lang: str = 'en') -> Dict:
+    """无 AI 时的简历结构化解析后备方案"""
+    import re
+    
+    text_lower = text.lower()
+    
+    # 简单提取邮箱和电话
+    email_pattern = r'[\w\.-]+@[\w\.-]+\.\w+'
+    phone_pattern = r'[\+]?[(]?[0-9]{1,4}[)]?[-\s\./0-9]{7,}'
+    
+    emails = re.findall(email_pattern, text)
+    phones = re.findall(phone_pattern, text)
+    
+    # 基本结构（无 AI 时只能返回有限信息）
+    return {
+        "personal": {
+            "name": "",
+            "email": emails[0] if emails else "",
+            "phone": phones[0] if phones else ""
+        },
+        "education": [],
+        "experience": [],
+        "skills": {
+            "technical": [],
+            "soft": [],
+            "language": []
+        },
+        "total_experience_years": 0,
+        "ai_enhanced": False,
+        "note": "AI unavailable - limited parsing only. Please upload resume with AI connection for full analysis."
+    }
+
+
 # === AI 增强简历分析 ===
 def analyze_resume_with_ai(text: str, lang: str = 'en', job_context: Dict = None) -> Dict:
     """使用 AI 深度分析简历
@@ -310,7 +1453,7 @@ def analyze_resume_with_ai(text: str, lang: str = 'en', job_context: Dict = None
 Stilling:
 - Titel: {job_context.get('job_title', 'Ikke angivet') if job_context else 'Ikke angivet'}
 - Virksomhed: {job_context.get('company', '') if job_context else 'Ikke angivet'}
-- Beskrivelse: {job_context.get('job_description', '')[:500] if job_context and job_context.get('job_description') else 'Ingen detaljeret beskrivelse'}
+- Beskrivelse: {(job_context.get('job_description') or '')[:500] or 'Ingen detaljeret beskrivelse'}
 
 CV:
 {text[:3000]}
@@ -337,7 +1480,7 @@ Returner JSON:
 Target Job:
 - Title: {job_context.get('job_title', 'Not specified')}
 - Company: {job_context.get('company', 'Not specified')}
-- Description: {job_context.get('job_description', '')[:500] if job_context.get('job_description') else 'No detailed description'}
+- Description: {(job_context.get('job_description') or '')[:500] or 'No detailed description'}
 
 Resume:
 {text[:3000]}
@@ -379,12 +1522,12 @@ Focus on:
 Resume:
 {text[:3000]}"""
         
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_RESUME or AI_MODEL,
+        response = smart_ai_request(
             messages=[
                 {"role": "system", "content": "You are a professional resume analyzer. Return only valid JSON."},
                 {"role": "user", "content": prompt}
             ],
+            preferred_provider="groq",
             temperature=0.3,
             max_tokens=2000
         )
@@ -401,12 +1544,21 @@ Resume:
                 'company': job_context.get('company', ''),
                 'job_match_score': result.get('job_match_score', 0)
             }
+            
+            # AI增强：自动识别关键要求和所需技能
+            if job_context.get('job_description'):
+                result['critical_requirements'] = identify_critical_requirements(
+                    job_context['job_description'], text, lang
+                )
+                result['required_skills'] = extract_required_skills_from_job(
+                    job_context['job_description'], lang
+                )
         
         return result
         
     except Exception as e:
         print(f"AI analysis failed: {e}, using fallback")
-        return analyze_resume_fallback(text, lang)
+        return analyze_resume_fallback(text, lang, job_context)
 
 def analyze_resume_fallback(text: str, lang: str = 'en', job_context: Dict = None) -> Dict:
     """本地规则分析（无需AI）
@@ -453,42 +1605,140 @@ def analyze_resume_fallback(text: str, lang: str = 'en', job_context: Dict = Non
     relevant_experience = []
     missing_skills = []
     job_specific_tips = []
+    learning_recommendations = []  # 学习建议
+    extracted_job_skills = []  # 职位要求技能
+    matched_skills = []  # 匹配的技能
     
     if job_context and job_context.get('job_title'):
-        job_title = job_context.get('job_title', '').lower()
-        job_desc = job_context.get('job_description', '').lower()
-        job_text = job_title + ' ' + job_desc
+        job_title = job_context.get('job_title', '')
+        job_desc = job_context.get('job_description', '')
         
-        # 计算匹配的技能数量
-        matched_skills = [s for s in detected_skills if s.lower() in job_text]
-        job_match_score = min(95, 40 + len(matched_skills) * 8)
+        # ===== AI驱动的Skill Gap分析（完全由AI完成，不使用硬编码关键词）=====
+        print(f"[AI] Analyzing skill gap for: {job_title}")
         
-        # 找出缺失的职位要求技能
-        job_required_skills = ['ERP', 'NetSuite', 'Dynamics', 'AX', 'SAP', 'Finance', 'SQL', 'Supply Chain']
-        missing_skills = [s for s in job_required_skills if s.lower() not in job_text]
+        skill_gap_result = analyze_skill_gap_ai(
+            resume_text=text,
+            job_description=job_desc,
+            job_title=job_title,
+            detected_skills=detected_skills,
+            lang=lang
+        )
         
-        # 生成相关经验提示
-        if 'netSuite' in job_text.lower() and 'netsuite' in text_lower:
-            relevant_experience.append({'zh': 'NetSuite实施经验', 'en': 'NetSuite implementation experience', 'da': 'NetSuite implementeringserfaring'}.get(lang, 'NetSuite experience'))
-        if 'dynamics' in job_text.lower() or 'ax' in job_text.lower():
-            if 'dynamics' in text_lower or 'ax' in text_lower:
-                relevant_experience.append({'zh': 'Dynamics AX实施经验', 'en': 'Dynamics AX implementation experience', 'da': 'Dynamics AX implementeringserfaring'}.get(lang, 'Dynamics AX experience'))
-        if 'finance' in job_text.lower() and 'finance' in text_lower:
-            relevant_experience.append({'zh': '财务模块经验', 'en': 'Finance module experience', 'da': 'Finansmodulerfaring'}.get(lang, 'Finance experience'))
+        # 使用AI分析结果
+        missing_skills = skill_gap_result.get('missing_skills', [])
+        matched_skills = skill_gap_result.get('matched_skills', [])
+        job_match_score = skill_gap_result.get('score', 50)
+        critical_requirements = skill_gap_result.get('critical_gaps', [])
+        ai_reasoning = skill_gap_result.get('reasoning', '')
         
-        # 职位特定的改进建议
-        if job_match_score < 60:
-            job_specific_tips.append({
-                'zh': f'建议突出 {len(matched_skills)} 项相关技能：{", ".join(matched_skills[:3])}',
-                'en': f'Highlight {len(matched_skills)} relevant skills: {", ".join(matched_skills[:3])}',
-                'da': f'Fremhæv {len(matched_skills)} relevante kompetencer: {", ".join(matched_skills[:3])}'
-            }.get(lang, f'Highlight {len(matched_skills)} relevant skills'))
+        print(f"[AI] Skill gap result: missing={missing_skills}, matched={matched_skills}, score={job_match_score}")
+        
+        # 限制缺失技能数量
+        if len(missing_skills) > 5:
+            missing_skills = missing_skills[:5]
+        
+        # ===== AI驱动的学习推荐 ======
+        if AI_AVAILABLE and missing_skills:
+            try:
+                learning_prompt = {
+                    'en': f"""Based on the following skill gaps, generate learning recommendations in JSON format:
+
+Missing Skills: {missing_skills}
+Job Title: {job_title}
+
+For each missing skill, generate a recommendation:
+[
+  {{
+    "skill": "skill name",
+    "suggestion": "specific learning recommendation (e.g., course name, platform)",
+    "level": "beginner/intermediate/advanced",
+    "resource_type": "video/course/certification",
+    "estimated_time": "e.g., 10 hours"
+  }}
+]
+
+Rules:
+1. Only for skills EXPLICITLY mentioned in the job description
+2. Be specific about courses and platforms
+3. Return ONLY JSON array""",
+                    
+                    'zh': f"""基于以下技能差距，生成学习推荐（JSON格式）：
+
+缺失技能：{missing_skills}
+职位名称：{job_title}
+
+对每个缺失技能，生成推荐：
+[
+  {{
+    "skill": "技能名",
+    "suggestion": "具体学习建议（如课程名、学习平台）",
+    "level": "beginner/intermediate/advanced",
+    "resource_type": "video/course/certification",
+    "estimated_time": "如：10小时"
+  }}
+]
+
+规则：
+1. 只针对职位描述中明确提到的技能
+2. 具体说明课程和平台
+3. 只返回JSON数组"""
+                }.get(lang, '')
+                
+                resp = smart_ai_request(
+                    messages=[
+                        {"role": "system", "content": "You are a learning advisor. Return ONLY valid JSON array."},
+                        {"role": "user", "content": learning_prompt}
+                    ],
+                    preferred_provider="groq",
+                    temperature=0.3,
+                    max_tokens=800
+                )
+                
+                content = resp.choices[0].message.content.strip()
+                if content.startswith('```'):
+                    content = content.split('```')[1]
+                    if content.startswith('json'):
+                        content = content[4:]
+                
+                learning_recommendations = json.loads(content)
+                print(f"[AI] Generated {len(learning_recommendations)} learning recommendations")
+                
+            except Exception as e:
+                print(f"Learning recommendation failed: {e}")
+                learning_recommendations = []
+        
+        # 软技能建议（可以添加到简历）
+        soft_skill_suggestions = []
+        
+        # 添加Gap分析改进建议
+        improvements.append({
+            'type': 'skill_gap',
+            'priority': 'high' if missing_skills else 'medium',
+            'description': {
+                'zh': f'🎯 Skill Gap分析：发现 {len(missing_skills)} 项可提升技能',
+                'en': f'🎯 Skill Gap: Found {len(missing_skills)} skills to develop',
+                'da': f'🎯 Skill Gap: Fundet {len(missing_skills)} kompetencer at udvikle'
+            }.get(lang, f'Skill Gap: {len(missing_skills)} skills'),
+            'suggestion': ai_reasoning or {
+                'zh': '针对性学习，提升岗位竞争力',
+                'en': 'Targeted learning to boost competitiveness',
+                'da': 'Målrettet læring for konkurrenceevne'
+            }.get(lang, 'Targeted learning')
+        })
         
         improvements.append({
             'type': 'job_relevance',
             'priority': 'high' if job_match_score < 60 else 'medium',
-            'description': {'zh': f'简历与职位匹配度：{job_match_score}%', 'en': f'Resume-Job Match Score: {job_match_score}%', 'da': f'CV-Job Match Score: {job_match_score}%'}.get(lang, f'Match: {job_match_score}%'),
-            'suggestion': {'zh': '根据职位要求调整简历重点', 'en': 'Tailor resume to job requirements', 'da': 'Tilpas CV til jobkrav'}.get(lang, 'Tailor to job')
+            'description': {
+                'zh': f'📊 简历-职位匹配度：{job_match_score}%',
+                'en': f'📊 Resume-Job Match: {job_match_score}%',
+                'da': f'📊 CV-Job Match: {job_match_score}%'
+            }.get(lang, f'Match: {job_match_score}%'),
+            'suggestion': {
+                'zh': '根据职位要求调整简历重点',
+                'en': 'Tailor resume to job requirements',
+                'da': 'Tilpas CV til jobkrav'
+            }.get(lang, 'Tailor to job')
         })
     
     years = re.findall(r'(\d+)\s*(?:年|years?|år)', text_lower)
@@ -530,6 +1780,13 @@ def analyze_resume_fallback(text: str, lang: str = 'en', job_context: Dict = Non
         result['relevant_experience'] = relevant_experience
         result['missing_skills'] = missing_skills[:5]
         result['job_specific_tips'] = job_specific_tips
+        result['learning_recommendations'] = learning_recommendations  # 学习建议
+        result['resume_skills'] = detected_skills  # 简历中的技能
+        result['required_skills'] = extracted_job_skills  # 职位要求技能
+        result['critical_requirements'] = critical_requirements  # 关键要求（日语等）
+        result['soft_skill_suggestions'] = soft_skill_suggestions  # 软技能建议
+        result['required_skills'] = extracted_job_skills  # 职位要求的技能
+        result['matched_skills'] = matched_skills  # 匹配的技能
     
     return result
 
@@ -537,10 +1794,12 @@ def analyze_resume_fallback(text: str, lang: str = 'en', job_context: Dict = Non
 analyze_resume = analyze_resume_with_ai
 
 # === AI 增强求职信生成 ===
-def generate_cover_letter_with_ai(resume_text: str, job: Dict, lang: str = 'en') -> str:
-    """使用 AI 生成高质量求职信
+def generate_cover_letter_with_ai(resume_text: str, job: Dict, lang: str = 'en', resume_highlights: List[Dict] = None, resume_structure: Dict = None) -> str:
+    """使用 AI 生成高质量求职信（升级版：使用简历亮点 + 结构化数据防瞎编）
     
     支持 LinkedIn 导入职位的三语生成（中/英/丹）
+    resume_highlights: 从精修建议中提取的简历亮点
+    resume_structure: 结构化简历数据（用于防止瞎编）
     """
     if not AI_AVAILABLE:
         return generate_cover_letter_fallback(resume_text, job, lang)
@@ -552,72 +1811,187 @@ def generate_cover_letter_with_ai(resume_text: str, job: Dict, lang: str = 'en')
         if is_linkedin:
             source_hint = "\n注意：此职位来自 LinkedIn，求职信应该简练有力，突出核心竞争力，适合快速浏览。"
         
+        # 简历亮点（如果有）
+        highlights_text = ""
+        if resume_highlights and len(resume_highlights) > 0:
+            highlights_list = "\n".join([
+                f"- {h.get('title', '')}: {h.get('description', '')}" 
+                for h in resume_highlights[:3]
+            ])
+            highlights_text = f"\n\n【简历亮点 - 请在求职信中重点使用】\n{highlights_list}\n"
+        
+        # 结构化简历数据（用于防止瞎编）
+        structure_context = ""
+        if resume_structure and resume_structure.get('ai_enhanced'):
+            edu_list = resume_structure.get('education', [])
+            exp_list = resume_structure.get('experience', [])
+            skills_data = resume_structure.get('skills', {})
+            
+            edu_str = ", ".join([f"{e.get('degree', '')} in {e.get('field', '')} from {e.get('school', '')} ({e.get('year', '')})" for e in edu_list]) if edu_list else "无学历信息"
+            exp_str = " | ".join([f"{e.get('company', '')} ({e.get('start', '')}-{e.get('end', '')}): {e.get('role', '')}" for e in exp_list[:3]]) if exp_list else "无工作经历"
+            tech_skills = ", ".join(skills_data.get('technical', [])[:10]) if skills_data.get('technical') else "未识别"
+            
+            structure_context = f"""
+
+【已验证的简历事实 - 求职信中只能使用这些信息，禁止编造！】
+学历: {edu_str}
+工作经历: {exp_str}
+技术技能: {tech_skills}
+总工作经验: {resume_structure.get('total_experience_years', 'N/A')}年
+
+⚠️ 严格规则：求职信中的所有案例、数字、公司名称必须来自上述已验证的事实！
+如果上述信息中没有某个公司的名字，不要在求职信中提及该公司。
+            """
+        
         prompts = {
-            'zh': f"""基于以下简历和职位信息，写一封专业的求职信（300-400字）：
+            'zh': f"""写一封专业的求职信（300-400字），打动{job.get('company', '这家公司')}的HR。
 
-简历亮点：
-{resume_text[:1500]}
+{highlights_text}{structure_context}【简历内容 - 请从这些真实信息中选择素材】
+{resume_text[:1000]}
 
-职位信息：
+【职位信息】
 - 公司：{job.get('company', '')}
 - 职位：{job.get('title', '')}
 - 地点：{job.get('location', '')}
 - 要求：{job.get('description', '')[:800]}
 {source_hint}
 
-要求：
-1. 突出简历中与职位匹配的经验
-2. 使用专业但真诚的语气
-3. 结构：开头（表达兴趣）→ 中间（2-3个匹配点，有具体例子）→ 结尾（行动号召）
-4. 如果简历中有相关行业/公司经验，重点提及
-5. 直接返回求职信正文，不要JSON""",
-            'en': f"""Write a professional cover letter (300-400 words) based on:
+【防瞎编规则 - 绝对遵守！否则求职信会失去可信度】
+⚠️ 最最重要规则：
+1. 只使用【简历内容】和【已验证的简历事实】中的信息
+2. 只能提及简历中明确写出的公司名称
+3. 只能使用简历中写出的数字和百分比
+4. 只能描述简历中提到的项目和技术
 
-Resume highlights:
-{resume_text[:1500]}
+❌ 绝对禁止（这些会让HR觉得你是在撒谎）：
+- 编造公司名：如"一家大型零售商"（除非简历中真的这么写）
+- 编造数字：如"提高效率40%"、"节省成本15万"（除非简历中真的有）
+- 编造项目：如"主导了XX项目"（除非简历中真的提到了）
+- 编造职位：如"曾任技术总监"（除非简历中真的这么写）
 
-Job details:
+✅ 正确做法：
+- 直接引用简历中的真实经历
+- 用"在我担任[简历中的真实职位]期间，我[简历中提到的真实行动]"格式
+- 如果简历中没有具体数字，就不要提数字，只描述做了什么
+
+1. 开头（前2句）：
+   ✅ 好："在[简历中的真实公司名]担任[简历中的真实职位]期间，我..."
+   ❌ 差："在一家知名企业，我让效率提升50%"（除非简历里真的这么写）
+2. 中间（2-3段）：
+   - 只描述简历中提到的真实经历
+   - 如果简历说"负责数据分析"，就说"负责数据分析"
+   - 如果简历没写数字，就不要说"提升了30%"
+3. 结尾：
+   ✅ 好："我对[公司名]的[职位相关业务]很感兴趣，希望能进一步讨论"
+   ❌ 差："相信我的经验能为贵公司创造巨大价值"（太泛）
+
+【北欧职场风格】
+- 直接、真诚、不过度自夸
+- 强调实际贡献而非夸大
+- 数据要真实，没有就不写
+
+直接返回求职信正文，不要JSON，不要格式符号。""",
+            'en': f"""Write a compelling cover letter (300-400 words) that will impress {job.get('company', 'this company')}'s HR.
+
+{highlights_text}【Resume Content - Use ONLY these REAL experiences】
+{resume_text[:1000]}
+
+{structure_context}
+
+【Job Details】
 - Company: {job.get('company', '')}
 - Position: {job.get('title', '')}
 - Location: {job.get('location', '')}
 - Requirements: {job.get('description', '')[:800]}
 {source_hint}
 
-Requirements:
-1. Highlight relevant experience matching the job (be specific with examples)
-2. Professional yet genuine tone — avoid generic phrases
-3. Structure: Opening (hook) → Body (2-3 match points with concrete examples) → Closing (call to action)
-4. If resume shows relevant industry/company experience, emphasize it
-5. Return only the cover letter text, no JSON""",
-            'da': f"""Skriv en professionel ansøgning (300-400 ord) baseret på:
+【ANTI-FABRICATION RULES - MANDATORY!】
+⚠️ MOST CRITICAL RULE:
+1. Use ONLY information from the resume content and verified facts above
+2. Only mention company names that are EXPLICITLY in the resume
+3. Only use numbers/percentages that are EXPLICITLY in the resume
+4. Only describe projects/technologies that are in the resume
 
-CV-højdepunkter:
-{resume_text[:1500]}
+❌ ABSOLUTELY FORBIDDEN (HR will think you're lying):
+- NEVER invent ANY percentage: 30%, 40%, 50%, etc. - UNLESS the word "30%" (or similar) is literally in the resume text
+- NEVER invent metrics: "increased by X", "reduced by Y", "saved Z amount" - UNLESS these numbers are in the resume
+- NEVER use company names not in the resume
+- NEVER describe projects not mentioned in the resume
 
-Jobdetaljer:
+✅ COPY-PASTE RULE:
+- Your job is to REWORD, not INVENT
+- If resume says "Improved reporting efficiency" - use those words or similar, but DO NOT add "by 30%"
+- If resume says "worked on data projects" - say "worked on data projects", not "led data projects that increased efficiency by 25%"
+
+⚠️ EXAMPLE - WRONG:
+Resume: "Improved reporting efficiency"
+Letter: "I improved reporting efficiency by 30%" ← ❌ WRONG! "30%" not in resume!
+
+⚠️ EXAMPLE - CORRECT:
+Resume: "Improved reporting efficiency"
+Letter: "I improved reporting efficiency" ← ✅ CORRECT! No invented numbers
+
+1. Opening (first 2 sentences):
+   ✅ Good: "In my role as a Data Analyst at ABC Company, I improved reporting efficiency."
+   ❌ Bad: "I improved reporting efficiency by 30%." (unless 30% is in resume)
+2. Body (2-3 paragraphs):
+   - Describe using the SAME LEVEL of detail as the resume
+   - If resume is vague, your letter should be vague (but professional)
+   - Never add specificity that isn't in the resume
+3. Closing:
+   ✅ Good: "I'm particularly interested in [company]'s work, and would welcome the opportunity to discuss how my experience aligns with the role."
+   ❌ Bad: "I will bring immediate value to your team" (too boastful without evidence)
+
+【Nordic Workplace Style】
+- Direct, genuine, not over-selling
+- Focus on actual contributions, not exaggerated claims
+- Real data speaks - if no numbers exist, don't invent them
+
+Return ONLY the cover letter text, no JSON, no formatting symbols.""",
+            'da': f"""Skriv en professionel ansøgning (300-400 ord), der vil imponere {job.get('company', 'denne virksomhed')}s HR.
+
+{highlights_text}【CV Indhold - Brug KUN disse VIRKELIGE erfaringer som materiale】
+{resume_text[:1000]}
+
+【Jobdetaljer】
 - Virksomhed: {job.get('company', '')}
 - Stilling: {job.get('title', '')}
 - Lokation: {job.get('location', '')}
 - Krav: {job.get('description', '')[:800]}
 {source_hint}
 
-Krav:
-1. Fremhæv relevant erfaring der matcher jobbet (vær konkret med eksempler)
-2. Professionel men oprigtig tone — undgå generiske fraser
-3. Struktur: Indledning (hook) → Hoveddel (2-3 matchpunkter med konkrete eksempler) → Afslutning (call to action)
-4. Hvis CV viser relevant brancherfaring, fremhæv det
-5. Dansk arbejdskultur: direkte kommunikation, fokus på værditilbud, undgå for meget selvros
-6. Returner kun ansøgningsteksten, ingen JSON"""
+【Skrivekrav - VIGTIGT! Følg strengt!】
+⚠️ MEST VIGTIGE REGLER: Alle eksempler, tal og resultater SKAL komme fra CV-indholdet ovenfor. FABRIKER ALDRIG!
+❌ FORBUDT: At opfinde virksomhedsnavne (som "en stor detailhandel"), at opfinde tal (som "15% stigning"), at opfinde projekter
+✅ KORREKT: Vælg virkelige erfaringer fra CV'et og omstrukturer dem med "Udfordring → Handling → Resultat"
+
+1. Indledning (første 2 sætninger): Fang opmærksomhed straks
+   ✅ Godt: "I min [virkelig jobtitel fra CV], lykkedes det mig at [virkelig handling fra CV]..."
+   ❌ Dårligt: "Hos Rolex reducerede jeg projektleveringstiden med 40%" (medmindre det virkelig står i CV'et)
+2. Hoveddel (2-3 afsnit): Baseret på VIRKELIGE CV-erfaringer
+   - Vælg virkelige projekter eller resultater fra CV'et
+   - Brug "Udfordring → Handling → Resultat" struktur
+   - Hvis CV'et ikke har specifikke tal, så tilføj ikke tal
+3. Afslutning: Specifik call to action
+   ✅ Godt: "Jeg vil meget gerne diskutere, hvordan jeg kan hjælpe {job.get('company', 'jeres virksomhed')} med at nå [specifikt mål fra jobbeskrivelsen]"
+   ❌ Dårligt: "Jeg ser frem til at høre fra jer"
+
+【Nordisk Arbejdspladsstil】
+- Direkte, ægte, ikke over-sælge
+- Fremhæv teamwork og kontinuerlig læring
+- Lad virkelige data tale (skal være autentiske data fra CV)
+
+Returner KUN ansøgningsteksten, ingen JSON."""
         }
         
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_COVER or AI_MODEL,
+        response = smart_ai_request(
             messages=[
-                {"role": "system", "content": "You are a professional career coach who writes compelling, personalized cover letters. You understand Nordic/Danish work culture — direct communication, value-focused, not overly boastful."},
+                {"role": "system", "content": "You are a professional career coach who writes compelling, personalized cover letters. You understand Nordic/Danish work culture — direct communication, value-focused, not overly boastful. You specialize in writing cover letters that get interviews."},
                 {"role": "user", "content": prompts.get(lang, prompts['en'])}
             ],
+            preferred_provider="groq",
             temperature=0.7,
-            max_tokens=1000
+            max_tokens=1200
         )
         
         letter = response.choices[0].message.content.strip()
@@ -703,7 +2077,7 @@ ADZUNA_COUNTRIES = {
 
 def search_adzuna(keyword: str, country: str = "gb", location: str = "", limit: int = 10) -> List[Dict]:
     """搜索国际职位 - Adzuna API"""
-    url = f"http://api.adzuna.com/v1/api/jobs/{country}/search/1"
+    url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
     params = {
         "app_id": ADZUNA_APP_ID,
         "app_key": ADZUNA_APP_KEY,
@@ -768,48 +2142,54 @@ def search_adzuna(keyword: str, country: str = "gb", location: str = "", limit: 
         print(f"Adzuna API Error: {e}")
         return []
 
-# 德国 Arbeitsagentur API
+# 德国 Arbeitsagentur API v2
 ARBEITSAGENTUR_KEY = "jobboerse-jobsuche"
+ARBEITSAGENTUR_BASE = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service"
 
 def search_germany(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
-    """搜索德国职位 - Arbeitsagentur API"""
-    # 增强关键词匹配：添加 ERP 相关同义词
-    enhanced_keyword = keyword
-    erp_synonyms = ['dynamics', 'ax', '365', 'finance', 'erp', 'sap', 'netsuite']
-    for syn in erp_synonyms:
-        if syn in keyword.lower():
-            enhanced_keyword = f"{keyword} {syn}"
-            break
-    
-    url = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/v1/app/v1/web/jobsuche"
+    """搜索德国职位 - Arbeitsagentur API v2"""
+    url = f"{ARBEITSAGENTUR_BASE}/pc/v4/jobs"
     params = {
-        "was": enhanced_keyword,
-        "wo": location if location else "Deutschland",
-        "umfang": "VOLLZEIT",
+        "was": keyword,
         "page": 1,
         "size": min(limit, 50)
     }
+    if location:
+        params["wo"] = location
+    else:
+        params["wo"] = "Deutschland"
+    
     headers = {
         "X-API-Key": ARBEITSAGENTUR_KEY,
-        "Content-Type": "application/json"
+        "User-Agent": "JobMatchAI/1.0"
     }
     
     try:
         r = requests.get(url, params=params, headers=headers, timeout=15)
         if r.status_code != 200:
+            print(f"Arbeitsagentur API Error: {r.status_code} - {r.text[:200]}")
             return []
         
         data = r.json()
         jobs = []
         
+        # 新版 API 返回格式: 直接是 stellenangebote 数组
         for j in data.get("stellenangebote", [])[:limit]:
+            if not isinstance(j, dict):
+                continue
+            arbeitsort = j.get("arbeitsort", {})
+            if isinstance(arbeitsort, dict):
+                location = arbeitsort.get("ort", "")
+            else:
+                location = str(arbeitsort)
+            
             jobs.append({
                 "title": j.get("titel", ""),
-                "company": j.get("arbeitgeber", {}).get("name", "N/A") if isinstance(j.get("arbeitgeber"), dict) else str(j.get("arbeitgeber", "N/A")),
-                "location": j.get("arbeitsort", {}).get("ort", "") if isinstance(j.get("arbeitsort"), dict) else str(j.get("arbeitsort", "")),
-                "description": j.get("beschreibung", "")[:500] if j.get("beschreibung") else "",
-                "url": j.get("refnr", ""),
-                "date": j.get("veroeffentlichungsdatum", "")[:10] if j.get("veroeffentlichungsdatum") else "",
+                "company": j.get("arbeitgeber", "N/A"),
+                "location": location,
+                "description": j.get("beruf", ""),
+                "url": j.get("externeUrl", f"https://jobboerse.arbeitsagentur.de/prod/jobboard/pc/v4/jobdetails/{j.get('refnr', '')}"),
+                "date": j.get("aktuelleVeroeffentlichungsdatum", "")[:10] if j.get("aktuelleVeroeffentlichungsdatum") else "",
                 "source": "🇩🇪 Arbeitsagentur",
                 "language": "de"
             })
@@ -930,13 +2310,24 @@ def search_usa(keyword: str, location: str = "", limit: int = 10) -> List[Dict]:
         data = r.json()
         jobs = []
         
-        for j in data.get("SearchResult", {}).get("SearchResultItems", [])[:limit]:
+        # 检查数据结构
+        search_result = data.get("SearchResult") if isinstance(data, dict) else {}
+        if isinstance(search_result, dict):
+            items = search_result.get("SearchResultItems", [])
+        else:
+            items = []
+        
+        for j in items[:limit]:
+            if not isinstance(j, dict):
+                continue
             src = j.get("MatchedObjectDescriptor", {})
+            if not isinstance(src, dict):
+                continue
             jobs.append({
                 "title": src.get("Title", ""),
                 "company": src.get("OrganizationName", "N/A"),
                 "location": src.get("LocationName", ""),
-                "description": src.get("UserArea", {}).get("Details", "")[:500] if src.get("UserArea", {}).get("Details") else "",
+                "description": src.get("UserArea", {}).get("Details", "")[:500] if isinstance(src.get("UserArea"), dict) and src.get("UserArea", {}).get("Details") else "",
                 "url": src.get("PositionURI", ""),
                 "date": src.get("PublicationStartDate", "")[:10] if src.get("PublicationStartDate") else "",
                 "source": "🇺🇸 USAJOBS",
@@ -967,7 +2358,7 @@ def read_root(request: Request):
         client_ip = request.client.host if request.client else "127.0.0.1"
     
     # 根据IP地理位置判断
-    is_china = ip_geo.is_china_ip(client_ip) if ip_geo._xdb_content else False
+    is_china = ip_geo.is_china_ip(client_ip) if hasattr(ip_geo, '_CHINA_IP_RANGES') and ip_geo._CHINA_IP_RANGES else False
     
     if is_china:
         # 中国大陆IP → 中文版
@@ -1011,18 +2402,30 @@ def health_check():
 
 @app.post("/upload-resume")
 async def upload_resume(file: UploadFile = File(...)):
-    """上传并解析简历"""
+    """上传并解析简历（升级版：AI结构化解析）"""
     try:
         content = await file.read()
         text = parse_resume(content, file.filename)
         lang = detect_language(text)
+        
+        # 使用 AI 进行结构化解析
+        parsed_structure = parse_resume_structure(text, lang)
         
         return {
             "success": True,
             "filename": file.filename,
             "text": text,
             "detected_language": lang,
-            "language_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(lang, "English")
+            "language_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(lang, "English"),
+            # 结构化数据（新功能）
+            "structure": {
+                "personal": parsed_structure.get("personal", {}),
+                "education": parsed_structure.get("education", []),
+                "experience": parsed_structure.get("experience", []),
+                "skills": parsed_structure.get("skills", {}),
+                "total_experience_years": parsed_structure.get("total_experience_years", 0),
+                "ai_enhanced": parsed_structure.get("ai_enhanced", False)
+            }
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1083,15 +2486,14 @@ Return JSON format:
 
 If information is not found, use empty string or empty array."""
 
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_RESUME or AI_MODEL,
+        response = smart_ai_request(
             messages=[
                 {"role": "system", "content": "You are a job description parser. Return only valid JSON."},
                 {"role": "user", "content": prompt}
             ],
+            preferred_provider="groq",
             temperature=0.3,
-            max_tokens=1500,
-            timeout=30
+            max_tokens=1500
         )
         
         content = response.choices[0].message.content.strip()
@@ -1165,9 +2567,11 @@ async def generate_cover_letter_endpoint(
     job_title: str = Form(...),
     company: str = Form(...),
     job_description: str = Form(...),
-    language: str = Form("da")
+    language: str = Form("da"),
+    resume_highlights: str = Form(""),  # JSON string of highlights from polish
+    resume_structure: str = Form("")  # JSON string of structured resume data
 ):
-    """生成求职信"""
+    """生成求职信（升级版：支持简历亮点 + 结构化数据防瞎编）"""
     try:
         job = {
             "title": job_title,
@@ -1176,12 +2580,41 @@ async def generate_cover_letter_endpoint(
             "source": "User Input"
         }
         
-        cover_letter = generate_cover_letter(resume_text, job, language)
+        # 解析简历亮点
+        highlights = []
+        if resume_highlights:
+            try:
+                highlights = json.loads(resume_highlights)
+            except:
+                pass
+        
+        # 解析结构化简历数据
+        structure_data = None
+        if resume_structure:
+            try:
+                structure_data = json.loads(resume_structure)
+            except:
+                pass
+        
+        # 如果没有提供亮点，先调用精修获取
+        if not highlights and AI_AVAILABLE:
+            job_context = {
+                "job_title": job_title,
+                "job_description": job_description,
+                "company": company
+            }
+            lang = language if language != "auto" else detect_language(resume_text)
+            polish_result = generate_polish_suggestions(resume_text, lang, job_context, structure_data)
+            if isinstance(polish_result, dict):
+                highlights = polish_result.get('resume_highlights', [])
+        
+        cover_letter = generate_cover_letter_with_ai(resume_text, job, language, highlights, structure_data)
         
         return {
             "success": True,
             "cover_letter": cover_letter,
-            "language": language
+            "language": language,
+            "highlights_used": len(highlights) > 0
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -1264,7 +2697,134 @@ async def update_profile_from_resume(user_id: str = Form(...), resume_text: str 
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-@app.post("/jobs/fetch-from-email")
+# ========== 用户粘性增强 API ==========
+
+@app.get("/user-profile/{user_id}/summary")
+async def get_profile_summary(user_id: str):
+    """获取用户画像摘要"""
+    try:
+        summary = profile_manager.get_profile_summary(user_id)
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/user-profile/resume-history")
+async def add_resume_history(
+    user_id: str = Form(...),
+    resume_text: str = Form(...),
+    polish_summary: str = Form(...),
+    job_context: str = Form(...),
+    match_score: float = Form(...),
+    skill_gaps: str = Form(...)  # JSON string
+):
+    """记录简历精修历史"""
+    try:
+        import json
+        gaps = json.loads(skill_gaps) if skill_gaps else []
+        profile = profile_manager.add_resume_history(
+            user_id, resume_text, polish_summary, 
+            job_context, match_score, gaps
+        )
+        return {"success": True, "version": len(profile.resume_history)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/user-profile/skill-gap")
+async def add_skill_gap(
+    user_id: str = Form(...),
+    job_title: str = Form(...),
+    job_description: str = Form(...),
+    resume_skills: str = Form(...),  # JSON string
+    required_skills: str = Form(...),  # JSON string
+    missing_skills: str = Form(...),  # JSON string
+    match_score: float = Form(...),
+    learning_recommendations: str = Form(...)  # JSON string
+):
+    """记录Skill Gap分析"""
+    try:
+        import json
+        resume_skills_list = json.loads(resume_skills) if resume_skills else []
+        required_skills_list = json.loads(required_skills) if required_skills else []
+        missing_skills_list = json.loads(missing_skills) if missing_skills else []
+        learning_recs = json.loads(learning_recommendations) if learning_recommendations else []
+        
+        profile = profile_manager.add_skill_gap(
+            user_id, job_title, job_description,
+            resume_skills_list, required_skills_list,
+            missing_skills_list, match_score, learning_recs
+        )
+        return {"success": True, "gap_count": len(profile.skill_gap_history)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/user-profile/application")
+async def add_application(
+    user_id: str = Form(...),
+    job_title: str = Form(...),
+    company: str = Form(...),
+    cover_letter: str = Form(...),
+    application_status: str = Form("sent")
+):
+    """记录申请历史"""
+    try:
+        profile = profile_manager.add_application(
+            user_id, job_title, company, cover_letter, application_status
+        )
+        return {"success": True, "application_count": len(profile.application_history)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.post("/user-profile/learning")
+async def add_learning_record(
+    user_id: str = Form(...),
+    skill: str = Form(...),
+    resource_title: str = Form(...),
+    resource_url: str = Form(...),
+    status: str = Form("viewed"),
+    completion_percent: int = Form(0)
+):
+    """记录学习资源浏览"""
+    try:
+        profile = profile_manager.add_learning_record(
+            user_id, skill, resource_title, resource_url,
+            status, completion_percent
+        )
+        return {"success": True, "learning_count": len(profile.learning_history)}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/user-profile/{user_id}/gap-trend")
+async def get_skill_gap_trend(user_id: str):
+    """获取Skill Gap改进趋势"""
+    try:
+        profile = profile_manager.get_profile(user_id)
+        if not profile:
+            return {"success": False, "error": "Profile not found"}
+        
+        # 计算Gap改进趋势
+        if len(profile.skill_gap_history) < 2:
+            return {"success": True, "trend": [], "message": "Need more data"}
+        
+        recent = profile.skill_gap_history[-5:]  # 最近5次
+        trend = []
+        for i, gap in enumerate(recent):
+            # 计算Gap减少情况
+            previous_gap = recent[i-1] if i > 0 else None
+            gap_count = len(gap.get('missing_skills', []))
+            
+            trend.append({
+                'timestamp': gap['timestamp'],
+                'job_title': gap['job_title'],
+                'match_score': gap['match_score'],
+                'missing_skills_count': gap_count,
+                'improved': previous_gap and gap_count < len(previous_gap.get('missing_skills', []))
+            })
+        
+        return {"success": True, "trend": trend}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/jobs/fetch-from-email")
 async def fetch_jobs_from_email(config: EmailConfig):
     """从用户邮箱读取招聘邮件"""
     try:
@@ -1358,38 +2918,33 @@ async def search_jobs(
     """统一职位搜索 API
     
     支持的 country 参数:
-    - all: 搜索所有来源（英国、德国、瑞典、丹麦、美国）
+    - all: 搜索所有来源（英国、澳大利亚、加拿大、法国、荷兰、比利时、美国、德国）
     - gb: 英国 (Adzuna)
     - au: 澳大利亚 (Adzuna)
     - ca: 加拿大 (Adzuna)
     - fr: 法国 (Adzuna)
     - nl: 荷兰 (Adzuna)
     - be: 比利时 (Adzuna)
+    - us: 美国 (Adzuna)
     - de: 德国 (Arbeitsagentur)
-    - se: 瑞典 (Jobtechdev)
-    - dk: 丹麦 (Jobinsats)
-    - us: 美国 (USAJOBS)
     """
     all_jobs = []
     
     try:
         if country == "all":
-            # 搜索所有来源（英国、德国、瑞典、丹麦、美国）
+            # 搜索所有来源
             all_jobs.extend(search_adzuna(keyword, "gb", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "us", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "au", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "ca", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "fr", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "nl", location, limit))
+            all_jobs.extend(search_adzuna(keyword, "be", location, limit))
             all_jobs.extend(search_germany(keyword, location, limit))
-            all_jobs.extend(search_sweden(keyword, location, limit))
-            all_jobs.extend(search_denmark(keyword, location, limit))
-            all_jobs.extend(search_usa(keyword, location, limit))
-        elif country in ["gb", "au", "ca", "fr", "nl", "be"]:
+        elif country in ["gb", "au", "ca", "fr", "nl", "be", "us"]:
             all_jobs.extend(search_adzuna(keyword, country, location, limit))
         elif country == "de":
             all_jobs.extend(search_germany(keyword, location, limit))
-        elif country == "se":
-            all_jobs.extend(search_sweden(keyword, location, limit))
-        elif country == "dk":
-            all_jobs.extend(search_denmark(keyword, location, limit))
-        elif country == "us":
-            all_jobs.extend(search_usa(keyword, location, limit))
         else:
             return {"success": False, "error": f"不支持的国家: {country}"}
         
@@ -1726,6 +3281,96 @@ async def analyze_skill_gap(
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# === AI学习资源推荐 API ===
+@app.post("/api/learning/recommend")
+async def get_learning_recommendations(
+    resume_structure: Dict = None,
+    job_description: str = "",
+    skill_gap: Dict = None,
+    lang: str = "en"
+):
+    """根据简历结构和技能差距推荐个性化学习资源
+    
+    Args:
+        resume_structure: 解析后的简历结构化数据
+        job_description: 职位描述
+        skill_gap: 技能差距分析结果
+        lang: 语言 (zh/en)
+    """
+    try:
+        if not resume_structure:
+            return {"success": False, "error": "Resume structure is required"}
+        
+        if not skill_gap:
+            skill_gap = {
+                "missing_skills": [],
+                "critical_gaps": [],
+                "matched_skills": [],
+                "score": 50,
+                "reasoning": ""
+            }
+        
+        result = recommend_learning_resources(
+            resume_structure=resume_structure,
+            job_description=job_description,
+            skill_gap=skill_gap,
+            lang=lang
+        )
+        
+        return result
+        
+    except Exception as e:
+        print(f"Learning recommendation error: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# === 验证学习资源链接有效性 ===
+@app.post("/api/learning/validate-links")
+async def validate_learning_links(urls: List[str] = None):
+    """验证学习资源链接的有效性
+    
+    Args:
+        urls: 要验证的链接列表
+    """
+    import asyncio
+    import httpx
+    
+    if not urls:
+        return {"success": False, "error": "No URLs provided"}
+    
+    async def check_url(url: str) -> Dict:
+        """检查单个URL的有效性"""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, follow_redirects=True)
+                if response.status_code == 200:
+                    return {"url": url, "valid": True, "status": 200}
+                elif response.status_code == 404:
+                    return {"url": url, "valid": False, "status": 404, "error": "页面不存在"}
+                else:
+                    return {"url": url, "valid": False, "status": response.status_code, "error": f"HTTP {response.status_code}"}
+        except httpx.TimeoutException:
+            return {"url": url, "valid": False, "error": "请求超时"}
+        except httpx.RequestError as e:
+            return {"url": url, "valid": False, "error": "无法访问"}
+        except Exception as e:
+            return {"url": url, "valid": False, "error": str(e)}
+    
+    # 并发验证所有链接
+    results = await asyncio.gather(*[check_url(url) for url in urls[:10]])  # 最多验证10个
+    
+    valid_count = sum(1 for r in results if r.get('valid', False))
+    
+    return {
+        "success": True,
+        "total": len(results),
+        "valid": valid_count,
+        "invalid": len(results) - valid_count,
+        "results": results,
+        "recommendation": f"{(valid_count / len(results) * 100):.0f}%链接有效" if results else "无链接可验证"
+    }
 
 
 # === 求职信质量测试 API ===
@@ -2914,19 +4559,15 @@ async def linkedin_cover_letter_endpoint(
     job_description: str = Form(""),
     job_location: str = Form(""),
     language: str = Form("auto"),
+    resume_highlights: str = Form(""),  # JSON string of highlights from polish
 ):
-    """从 LinkedIn 导入的职位生成三语求职信
+    """从 LinkedIn 导入的职位生成三语求职信（升级版：支持简历亮点）
     
     language 参数：
     - "auto": 自动检测职位描述语言
     - "zh": 中文
     - "en": 英文
     - "da": 丹麦文
-    
-    与 /generate-cover-letter 的区别：
-    - 增强了职位来源识别（LinkedIn）
-    - 自动语言检测
-    - 更好的 Danish 求职信模板
     """
     try:
         # 自动检测语言
@@ -2944,13 +4585,33 @@ async def linkedin_cover_letter_endpoint(
             "url": ""
         }
 
-        cover_letter = generate_cover_letter(resume_text, job, lang)
+        # 解析简历亮点
+        highlights = []
+        if resume_highlights:
+            try:
+                highlights = json.loads(resume_highlights)
+            except:
+                pass
+        
+        # 如果没有提供亮点，先调用精修获取
+        if not highlights and AI_AVAILABLE:
+            job_context = {
+                "job_title": job_title,
+                "job_description": job_description,
+                "company": company
+            }
+            polish_result = generate_polish_suggestions(resume_text, lang, job_context)
+            if isinstance(polish_result, dict):
+                highlights = polish_result.get('resume_highlights', [])
+
+        cover_letter = generate_cover_letter_with_ai(resume_text, job, lang, highlights, None)  # 结构化数据从上传时获取
 
         return {
             "success": True,
             "cover_letter": cover_letter,
             "language": lang,
             "language_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(lang, "English"),
+            "highlights_used": len(highlights) > 0,
             "job": {
                 "title": job_title,
                 "company": company,
@@ -3914,6 +5575,11 @@ async def get_status_options_endpoint(
 class PolishRequest(BaseModel):
     resume_text: str
     language: str = "auto"
+    job_title: str = ""
+    job_description: str = ""
+    company: str = ""
+    # 结构化简历数据（新功能，来自 parse_resume_structure）
+    resume_structure: Optional[Dict] = None
 
 class PolishApplyRequest(BaseModel):
     original_text: str
@@ -3924,270 +5590,529 @@ class DiscoverSkillsRequest(BaseModel):
     resume_text: str = ""
     document_type: str = "document"
 
-def generate_polish_suggestions(text: str, lang: str = 'en') -> List[Dict]:
-    """使用 AI 生成逐条精修建议（升级版：分队优化算法）"""
+def generate_polish_suggestions(text: str, lang: str = 'en', job_context: Dict = None, resume_structure: Dict = None) -> List[Dict]:
+    """使用 AI 生成逐条精修建议（升级版：简历亮点 + 职位匹配能力分析 + 结构化数据）
+    
+    Args:
+        text: 简历文本
+        lang: 语言代码
+        job_context: 职位上下文
+        resume_structure: 结构化简历数据（来自 parse_resume_structure）
+    """
     if not AI_AVAILABLE:
         return generate_polish_fallback(text, lang)
 
-    # 升级版提示词模板（应用分队算法优化成果）
-    prompts_by_lang = {
-        'zh': """你是一位拥有20年HR高管经验的顶级职业顾问。请深度分析这份简历，提供专业精修建议。
+    # 构建简历结构化数据上下文
+    structure_context = ""
+    if resume_structure and resume_structure.get('ai_enhanced'):
+        edu_list = resume_structure.get('education', [])
+        exp_list = resume_structure.get('experience', [])
+        skills_data = resume_structure.get('skills', {})
+        
+        edu_str = ", ".join([f"{e.get('degree', '未知')}{e.get('field', '')}({e.get('school', '')}, {e.get('year', 'N/A')})" for e in edu_list]) if edu_list else "未识别到教育经历"
+        exp_str = "\n".join([f"- {e.get('company', '公司')}: {e.get('role', '职位')} ({e.get('start', '')} - {e.get('end', '')})" for e in exp_list[:5]]) if exp_list else "未识别到工作经历"
+        tech_skills = ", ".join(skills_data.get('technical', [])[:15]) if skills_data.get('technical') else "未识别到技术技能"
+        
+        structure_context = f"""
+【简历结构化数据（已识别）】
+学历: {edu_str}
+工作经历（最近5个）:
+{exp_str}
+技术技能: {tech_skills}
+总工作经验: {resume_structure.get('total_experience_years', 'N/A')}年
 
-【核心要求 - 必须严格执行】
-你必须逐一检查简历中的每一句话，找出**所有**需要改进的地方。
-**绝对不能遗漏任何弱句！** 如果简历有10个弱句，就返回10条建议。
+请结合以上已识别的简历结构数据，给出更精准的精修建议。
+"""
+    
+    # 升级版提示词模板（中文）
+    prompt_zh = """你是一位拥有20年HR高管经验的顶级职业顾问。请深度分析这份简历，提供专业精修建议，并提炼简历亮点。
+{structure_context}
+【核心要求】
+1. 检查简历中的**每一句话**，找出所有需要改进的地方
+2. 分析简历与职位的匹配度，找出核心能力亮点
+3. 提炼出3个"简历亮点"，供后续求职信使用
 
-【必须标记为需要改进的句子类型】
-1. **弱动词句子**：包含"负责"、"参与"、"协助"、"做了"、"完成了"、"参与"、"支持"等被动词
+【必须改进的句子类型】
+1. **弱动词句子**：包含"负责"、"参与"、"协助"、"做了"等被动词
 2. **缺乏量化**：没有数字、数据、百分比的成就描述
 3. **笼统描述**：可以更具体却没有具体化的内容
 4. **重复内容**：与前后句子意思重复的表达
 
-【精修原则】
-- 禁止使用：负责、参与、协助、做了、完成（弱动词）
-- 必须包含：量化数据、具体成果、独特价值
-- 北欧职场适配：强调协作、平等、成果导向的表达方式
+【北欧职场适配 - 重要！】
+- 强调协作、平等、成果导向的表达方式
+- 丹麦HR喜欢：具体数据、直接表达、团队贡献、持续学习
+- 避免：过度自我推销、模糊描述、不具体的承诺
 
-【输出格式】
-每条建议必须包含：
-- original: 简历原文（精确匹配，10-50字）
-- suggested: 精修版本（保持原意但更专业，10-60字）
-- reason: 修改原因（50-100字），必须说明：
-  * 原句的问题（具体哪里不够好）
-  * 新版本的改进（如何更好）
-  * 对求职的价值（为什么招聘方会注意到）
-- type: 类型（weak_verb/quantification/differentiation/story/format）
-- priority: 优先级（high/medium/low）
+【输出格式 - 必须严格遵循】
+返回JSON格式，包含两个部分：
 
-【示例】
-简历原文: "负责ERP系统实施"
-返回建议:
-{
-  "original": "负责ERP系统实施",
-  "suggested": "主导ERP系统实施，3个月内完成200+用户上线",
-  "reason": "原句'负责'过于被动，只说明参与了工作。新句'主导'体现领导力和项目控制能力，'3个月'和'200+用户'提供量化证据，让招聘方直观看到你的交付能力和影响范围。",
-  "type": "weak_verb",
-  "priority": "high"
-}
+```json
+{{
+  "suggestions": [
+    {{
+      "id": 1,
+      "original": "简历原文（精确匹配）",
+      "suggested": "精修版本（保持原意但更专业）",
+      "reason": "为什么这样改（50-100字）",
+      "type": "weak_verb/quantification/vague/redundant",
+      "priority": "high/medium/low"
+    }}
+  ],
+  "resume_highlights": [
+    {{
+      "title": "亮点标题（3-8个字）",
+      "description": "亮点描述（供求职信用，50-100字）",
+      "evidence": "简历中的证据（原文或精修后）"
+    }}
+  ],
+  "job_match_score": "85%",
+  "recommendation": "针对这个职位的整体建议（30-50字）"
+}}
+```
+
+【示例 - Resume Highlights】
+简历中有："主导ERP实施项目，3个月内完成200+用户上线，零事故"
+亮点输出：
+```json
+{{
+  "title": "ERP实施专家",
+  "description": "3个月内完成大型ERP项目上线，200+用户无事故切换，展现快速交付和风险管理能力",
+  "evidence": "主导ERP实施项目，3个月内完成200+用户上线"
+}}
+```
 
 简历内容：
-{text[:4000]}
+"""
 
-返回JSON数组。只返回JSON，不要任何其他文字。""",
-        'en': """You are a top career consultant with 20 years of HR executive experience. Provide professional resume improvement suggestions.
+    # 升级版提示词模板
+    prompts_by_lang = {
+        'zh': prompt_zh.format(structure_context=structure_context) + text[:4000],
+        'en': """You are a top career consultant with 20 years of HR executive experience. Analyze this resume and provide improvement suggestions with resume highlights.
 
-【Core Requirement - MUST FOLLOW STRICTLY】
-Check EVERY sentence in the resume. Find ALL weak sentences that need improvement.
-**DO NOT skip any weak sentences!** If the resume has 10 weak sentences, return 10 suggestions.
+【Core Requirements】
+1. Check EVERY sentence for improvement opportunities
+2. Analyze job match and identify core competency highlights
+3. Extract 3 "resume highlights" for use in cover letters
 
-【Must Flag These Sentence Types】
-1. **Weak Verb Sentences**: Contains "responsible for", "participated in", "assisted", "helped with", "worked on", "supported", "helped"
-2. **Missing Quantification**: Achievements without numbers, percentages, or concrete metrics
-3. **Vague Descriptions**: Content that could be more specific but isn't
+【Must Improve These】
+1. **Weak Verbs**: "responsible for", "participated in", "assisted", "helped"
+2. **Missing Quantification**: Achievements without numbers/percentages
+3. **Vague Descriptions**: Content that could be more specific
 4. **Redundant Content**: Repetitive expressions
 
-【Improvement Principles】
-- FORBIDDEN: responsible for, participated in, assisted, helped with (weak verbs)
-- MUST INCLUDE: quantifiable data, concrete results, unique value
-- Nordic Workplace Fit: Emphasize collaboration, equality, and result-oriented expression
+【Nordic Workplace Fit - IMPORTANT!】
+- Emphasize: collaboration, equality, result-oriented expression
+- Danish HR likes: concrete data, direct communication, team contribution, continuous learning
+- Avoid: over-selling, vague descriptions, empty promises
 
-【Output Format】
-Each suggestion must include:
-- original: exact text from resume (10-50 characters)
-- suggested: polished version keeping original meaning (10-60 characters)
-- reason: explanation (50-100 characters) covering:
-  * Problem with original (specific weakness)
-  * Improvement in new version (how it's better)
-  * Job search value (why recruiters will notice)
-- type: type (weak_verb/quantification/differentiation/story/format)
-- priority: priority (high/medium/low)
-
-【Example】
-Resume text: "Responsible for ERP implementation"
-Return:
+【Output Format - STRICT】
+```json
 {
-  "original": "Responsible for ERP implementation",
-  "suggested": "Led ERP implementation, delivered to 200+ users in 3 months",
-  "reason": "'Responsible for' is passive and vague. 'Led' shows leadership and project control. '200+ users in 3 months' provides quantifiable evidence of delivery capability and impact scope.",
-  "type": "weak_verb",
-  "priority": "high"
+  "suggestions": [
+    {
+      "id": 1,
+      "original": "exact text from resume",
+      "suggested": "polished version",
+      "reason": "why change (50-100 chars)",
+      "type": "weak_verb/quantification/vague/redundant",
+      "priority": "high/medium/low"
+    }
+  ],
+  "resume_highlights": [
+    {
+      "title": "Highlight Title (3-8 words)",
+      "description": "Highlight description for cover letter (50-100 chars)",
+      "evidence": "Evidence from resume"
+    }
+  ],
+  "job_match_score": "85%",
+  "recommendation": "Overall recommendation for this job (30-50 chars)"
 }
+```
 
 Resume:
-{text[:4000]}
+{text[:4000]}""",
+        'da': """Du er en top karrierekonsulent med 20 års erfaring som HR-direktør. Analyser dette CV og giv forbedringsforslag med CV-højdepunkter.
 
-IMPORTANT: Return suggestions for EVERY weak sentence found. Return ONLY JSON array, nothing else.""",
-        'da': """Du er en top karrierekonsulent med 20 års erfaring som HR-direktør. Giv professionelle forbedringsforslag til CV'et.
+【Kernekrav】
+1. Gennemgå HVER sætning for forbedringer
+2. Analyser jobmatch og identificer kernekompetence-højdepunkter
+3. Udtræk 3 "CV-højdepunkter" til brug i ansøgninger
 
-【Kernekrav - SKAL FØLGES STRENGT】
-Gennemgå HVER sætning i CV'et. Find ALLE svage sætninger, der skal forbedres.
-**Gå IKKE udenom nogen svage sætninger!** Hvis CV'et har 10 svage sætninger, returner 10 forslag.
-
-【Skal Markere Disse Sætningstyper】
-1. **Svage Verbum-sætninger**: Indeholder "ansvarlig for", "deltog i", "assisterede", "hjælpe med", "arbejdede på", "understøttede"
-2. **Manglende Kvantificering**: Præstationer uden tal, procenter eller konkrete målinger
-3. **Vage Beskrivelser**: Indhold der kunne være mere specifikt men ikke er
+【Skal Forbedres】
+1. **Svage Verbum**: "ansvarlig for", "deltog i", "assisterede"
+2. **Manglende Kvantificering**: Præstationer uden tal/procenter
+3. **Vage Beskrivelser**: Indhold der kunne være mere specifikt
 4. **Gentaget Indhold**: Repetitive udtryk
 
-【Forbedringsprincipper】
-- FORBUDT: ansvarlig for, deltog i, assisterede (svage verber)
-- SKAL INDEHOLDE: kvantificerbare data, konkrete resultater
-- Nordisk arbejdspladstilpasning: Fremhæv samarbejde, lighed og resultatorientering
+【Nordisk Arbejdspladstilpasning】
+- Fremhæv: samarbejde, lighed, resultatorientering
+- Danske HR kan lide: konkrete data, direkte kommunikation, teambidrag
 
 【Output-format】
-Hvert forslag skal indeholde:
-- original: præcis tekst fra CV (10-50 tegn)
-- suggested: forbedret version (10-60 tegn)
-- reason: forklaring (50-100 tegn)
-- type: type (weak_verb/quantification/differentiation/story/format)
-- priority: prioritet (high/medium/low)
-
-【Eksempel】
-CV-tekst: "Ansvarlig for ERP-implementering"
-Returner:
+```json
 {
-  "original": "Ansvarlig for ERP-implementering",
-  "suggested": "Ledede ERP-implementering, leverede til 200+ brugere på 3 måneder",
-  "reason": "'Ansvarlig for' er passivt. 'Ledede' viser lederskab. '200+ brugere på 3 måneder' giver kvantificerbare beviser.",
-  "type": "weak_verb",
-  "priority": "high"
+  "suggestions": [...],
+  "resume_highlights": [...],
+  "job_match_score": "85%",
+  "recommendation": "..."
 }
+```
 
 CV:
-{text[:4000]}
-
-VIGTIGT: Returner forslag til ALLE svage sætninger. Returner KUN JSON-array.""",
+{text[:4000]}""",
     }
 
     try:
-        prompt = prompts_by_lang.get(lang, prompts_by_lang['en'])
+        # 根据语言生成 prompt（支持结构化数据上下文）
+        base_prompts = {
+            'zh': """你是一位拥有20年HR高管经验的顶级职业顾问。请深度分析这份简历，提供专业精修建议，并提炼简历亮点。
 
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_RESUME or AI_MODEL,
+【核心要求】
+1. 检查简历中的**每一句话**，找出所有需要改进的地方
+2. 分析简历与职位的匹配度，找出核心能力亮点
+3. 提炼出3个"简历亮点"，供后续求职信使用
+
+【必须改进的句子类型】
+1. **弱动词句子**：包含"负责"、"参与"、"协助"、"做了"等被动词
+2. **缺乏量化**：没有数字、数据、百分比的成就描述
+3. **笼统描述**：可以更具体却没有具体化的内容
+4. **重复内容**：与前后句子意思重复的表达
+
+【北欧职场适配 - 重要！】
+- 强调协作、平等、成果导向的表达方式
+- 丹麦HR喜欢：具体数据、直接表达、团队贡献、持续学习
+- 避免：过度自我推销、模糊描述、不具体的承诺
+
+【输出格式 - 必须严格遵循】
+返回JSON格式，包含两个部分：
+
+```json
+{
+  "suggestions": [
+    {
+      "id": 1,
+      "original": "简历原文（精确匹配）",
+      "suggested": "精修版本（保持原意但更专业）",
+      "reason": "为什么这样改（50-100字）",
+      "type": "weak_verb/quantification/vague/redundant",
+      "priority": "high/medium/low"
+    }
+  ],
+  "resume_highlights": [
+    {
+      "title": "亮点标题（3-8个字）",
+      "description": "亮点描述（供求职信用，50-100字）",
+      "evidence": "简历中的证据（原文或精修后）"
+    }
+  ],
+  "job_match_score": "85%",
+  "recommendation": "针对这个职位的整体建议（30-50字）"
+}
+```
+
+【示例 - Resume Highlights】
+简历中有："主导ERP实施项目，3个月内完成200+用户上线，零事故"
+亮点输出：
+```json
+{
+  "title": "ERP实施专家",
+  "description": "3个月内完成大型ERP项目上线，200+用户无事故切换，展现快速交付和风险管理能力",
+  "evidence": "主导ERP实施项目，3个月内完成200+用户上线"
+}
+```
+
+简历内容：
+""",
+            'en': """You are a top career consultant with 20 years of HR executive experience. Analyze this resume and provide improvement suggestions with resume highlights.
+
+【Core Requirements】
+1. Check EVERY sentence for improvement opportunities
+2. Analyze job match and identify core competency highlights
+3. Extract 3 "resume highlights" for use in cover letters
+
+【Must Improve These】
+1. **Weak Verbs**: "responsible for", "participated in", "assisted", "helped"
+2. **Missing Quantification**: Achievements without numbers/percentages
+3. **Vague Descriptions**: Content that could be more specific
+4. **Redundant Content**: Repetitive expressions
+
+【Nordic Workplace Fit - IMPORTANT!】
+- Emphasize: collaboration, equality, result-oriented expression
+- Danish HR likes: concrete data, direct communication, team contribution, continuous learning
+- Avoid: over-selling, vague descriptions, empty promises
+
+【Output Format - STRICT】
+```json
+{
+  "suggestions": [
+    {
+      "id": 1,
+      "original": "exact text from resume",
+      "suggested": "polished version",
+      "reason": "why change (50-100 chars)",
+      "type": "weak_verb/quantification/vague/redundant",
+      "priority": "high/medium/low"
+    }
+  ],
+  "resume_highlights": [
+    {
+      "title": "Highlight Title (3-8 words)",
+      "description": "Highlight description for cover letter (50-100 chars)",
+      "evidence": "Evidence from resume"
+    }
+  ],
+  "job_match_score": "85%",
+  "recommendation": "Overall recommendation for this job (30-50 chars)"
+}
+```
+
+Resume:
+""",
+            'da': """Du er en top karrierekonsulent med 20 års erfaring som HR-direktør. Analyser dette CV og giv forbedringsforslag med CV-højdepunkter.
+
+【Kernekrav】
+1. Gennemgå HVER sætning for forbedringer
+2. Analyser jobmatch og identificer kernekompetence-højdepunkter
+3. Udtræk 3 "CV-højdepunkter" til brug i ansøgninger
+
+【Skal Forbedres】
+1. **Svage Verbum**: "ansvarlig for", "deltog i", "assisterede"
+2. **Manglende Kvantificering**: Præstationer uden tal/procenter
+3. **Vage Beskrivelser**: Indhold der kunne være mere specifikt
+4. **Gentaget Indhold**: Repetitive udtryk
+
+【Nordisk Arbejdspladstilpasning】
+- Fremhæv: samarbejde, lighed, resultatorientering
+- Danske HR kan lide: konkrete data, direkte kommunikation, teambidrag
+
+【Output-format】
+```json
+{
+  "suggestions": [...],
+  "resume_highlights": [...],
+  "job_match_score": "85%",
+  "recommendation": "..."
+}
+```
+
+CV:
+"""
+        }
+        
+        # 拼接：结构化上下文 + 基础prompt + 简历文本
+        base = base_prompts.get(lang, base_prompts['en'])
+        prompt = structure_context + base + text[:4000]
+        
+        # 如果有职位上下文，追加职位信息
+        if job_context and job_context.get('job_title'):
+            job_context_section = {
+                'zh': f"""
+【目标职位上下文 - 请重点关注】
+职位名称: {job_context.get('job_title', '')}
+公司: {job_context.get('company', '未指定')}
+职位描述: {job_context.get('job_description', '')[:800] or '无详细描述'}
+
+【职位匹配要求】
+1. 优先突出与职位最相关的经验、技能和成就
+2. 分析简历与职位的匹配度，给出百分比评分
+3. 如果简历中缺少某些技能，强调已有的可迁移技能
+4. 调整表达方式，使用职位描述中的关键词（ATS友好）
+""",
+                'en': f"""
+【Target Job Context - Focus on these】
+Job Title: {job_context.get('job_title', '')}
+Company: {job_context.get('company', 'Not specified')}
+Job Description: {(job_context.get('job_description') or '')[:800] or 'No description'}
+
+【Job Matching Requirements】
+1. Prioritize experiences most relevant to the job
+2. Analyze job match score (give percentage)
+3. If skills are missing, emphasize transferable skills
+4. Use job description keywords (ATS-friendly)
+""",
+                'da': f"""
+【Målstilling Kontekst】
+Jobtitel: {job_context.get('job_title', '')}
+Virksomhed: {job_context.get('company', 'Ikke angivet')}
+Jobbeskrivelse: {(job_context.get('job_description') or '')[:800] or 'Ingen beskrivelse'}
+
+【Job Match Krav】
+1. Prioriter mest relevante erfaringer
+2. Analyser job match score (procent)
+3. Fremhæv overførbare færdigheder
+""",
+            }
+            lang_key = 'zh' if lang.startswith('zh') else ('da' if lang.startswith('da') else 'en')
+            context_text = job_context_section.get(lang_key, job_context_section['en'])
+            prompt = prompt.replace('{text[:4000]}', '{text[:3500]}' + context_text + '\n\nResume:\n{text[:3500]}')
+
+        response = smart_ai_request(
             messages=[
-                {"role": "system", "content": "You are a professional resume writing expert. Return only valid JSON."},
+                {"role": "system", "content": "You are a professional resume writing expert. Return ONLY valid JSON with suggestions array and resume_highlights array."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.2,  # 降低随机性
-            max_tokens=6000,  # 支持最多30条建议输出
-            timeout=60
+            preferred_provider="groq",
+            temperature=0.2,
+            max_tokens=8000
         )
 
         content = response.choices[0].message.content.strip()
+        # 清理可能的markdown格式
         if content.startswith('```'):
             content = content.split('```')[1]
             if content.startswith('json'):
                 content = content[4:]
-        suggestions = json.loads(content)
-
+        
+        result = json.loads(content)
+        suggestions = result.get('suggestions', [])
+        
         for i, s in enumerate(suggestions):
             if 'id' not in s:
                 s['id'] = i + 1
 
-        # 限制最多30条建议
+        # 限制建议数量
         MAX_SUGGESTIONS = 30
-        return suggestions[:MAX_SUGGESTIONS]
+        suggestions = suggestions[:MAX_SUGGESTIONS]
+        
+        # 返回完整结果（包括resume_highlights）
+        return {
+            'suggestions': suggestions,
+            'resume_highlights': result.get('resume_highlights', []),
+            'job_match_score': result.get('job_match_score', 'N/A'),
+            'recommendation': result.get('recommendation', '')
+        }
 
     except Exception as e:
         print(f"Polish suggestions failed: {e}, using fallback")
-        return generate_polish_fallback(text, lang)
+        return {
+            'suggestions': generate_polish_fallback(text, lang, job_context),
+            'resume_highlights': [],
+            'job_match_score': 'N/A',
+            'recommendation': ''
+        }
 
-def generate_polish_fallback(text: str, lang: str = 'en') -> List[Dict]:
-    """本地规则生成精修建议（无需AI）- 提供详细解释"""
+def generate_polish_fallback(text: str, lang: str = 'en', job_context: Dict = None) -> List[Dict]:
+    """本地规则生成精修建议（无需AI）- 增强版，基于职位上下文"""
+    suggestions = []
+    job_title = job_context.get('job_title', '') if job_context else ''
+    job_desc = job_context.get('job_description', '') if job_context else ''
+    
     # 弱动词映射及详细解释
     weak_verb_details = {
         'zh': [
-            {
-                'weak': '负责',
-                'strong': '主导',
-                'reason': '"负责"只是说明你参与了这项工作，但没有体现你的主动性和成果。"主导"则强调你是项目的推动者和决策者，展现了领导力和责任感，让招聘方看到你能独立承担重要任务。'
-            },
-            {
-                'weak': '参与',
-                'strong': '推动',
-                'reason': '"参与"暗示你只是团队中的一员，贡献度不明确。"推动"则表明你是项目的核心驱动力，能够主动解决问题、协调资源，体现更强的执行力和影响力。'
-            },
-            {
-                'weak': '协助',
-                'strong': '协同',
-                'reason': '"协助"给人一种配角的感觉，似乎只是打下手。"协同"则强调你与团队平等合作、共同完成任务的能力，体现跨部门沟通和协作的专业素养。'
-            },
-            {
-                'weak': '做了',
-                'strong': '实现',
-                'reason': '"做了"过于口语化和模糊，缺乏专业感。"实现"则带有目标达成的意味，暗示你不仅完成了任务，还取得了可衡量的成果，更符合职场专业表达。'
-            }
+            {'weak': '负责', 'strong': '主导', 'reason': '"负责"只是说明你参与了这项工作，但没有体现你的主动性和成果。"主导"则强调你是项目的推动者和决策者，展现了领导力和责任感。'},
+            {'weak': '参与', 'strong': '推动', 'reason': '"参与"暗示你只是团队中的一员，贡献度不明确。"推动"表明你是项目的核心驱动力，能够主动解决问题。'},
+            {'weak': '协助', 'strong': '协同', 'reason': '"协助"给人一种配角的感觉。"协同"强调你与团队平等合作，体现跨部门沟通协作能力。'},
+            {'weak': '做了', 'strong': '实现', 'reason': '"做了"过于口语化和模糊。"实现"带有目标达成的意味，更符合职场专业表达。'},
+            {'weak': '完成了', 'strong': '交付了', 'reason': '"完成了"只说明任务结束。"交付了"暗示你不仅完成，还提供了可用的成果，体现成果导向。'},
+            {'weak': '支持', 'strong': '赋能', 'reason': '"支持"显得被动。"赋能"表明你帮助团队或业务实现更大价值，更有影响力。'},
+            {'weak': '处理', 'strong': '优化', 'reason': '"处理"只是描述动作。"优化"暗示你不仅处理了问题，还改进了流程或效率。'},
+            {'weak': '使用', 'strong': '精通', 'reason': '"使用"说明会用工具。"精通"表明你对该工具有深入掌握，更有竞争力。'}
         ],
         'en': [
-            {
-                'weak': 'responsible for',
-                'strong': 'led',
-                'reason': '"Responsible for" merely states you were involved, but shows no initiative or results. "Led" demonstrates you were the driver and decision-maker, showcasing leadership and ownership. It transforms you from a participant into a leader.'
-            },
-            {
-                'weak': 'worked on',
-                'strong': 'delivered',
-                'reason': '"Worked on" is vague about your contribution and impact. "Delivered" implies you completed the project successfully and achieved tangible results. It shows you finish what you start and create value.'
-            },
-            {
-                'weak': 'helped with',
-                'strong': 'collaborated on',
-                'reason': '"Helped with" suggests you played a minor supporting role. "Collaborated on" positions you as an equal partner who contributed meaningfully to the team effort, highlighting your teamwork and communication skills.'
-            }
+            {'weak': 'responsible for', 'strong': 'led', 'reason': '"Responsible for" merely states involvement. "Led" demonstrates you were the driver and decision-maker, showcasing leadership.'},
+            {'weak': 'worked on', 'strong': 'delivered', 'reason': '"Worked on" is vague. "Delivered" implies successful completion with tangible results.'},
+            {'weak': 'helped with', 'strong': 'collaborated on', 'reason': '"Helped with" suggests a minor role. "Collaborated on" positions you as an equal partner.'},
+            {'weak': 'participated in', 'strong': 'spearheaded', 'reason': '"Participated in" shows passive involvement. "Spearheaded" shows you took initiative and led.'},
+            {'weak': 'assisted with', 'strong': 'enabled', 'reason': '"Assisted with" implies a supporting role. "Enabled" shows you empowered the team to achieve more.'},
+            {'weak': 'handled', 'strong': 'streamlined', 'reason': '"Handled" describes the action. "Streamlined" implies you improved the process or efficiency.'},
+            {'weak': 'used', 'strong': 'mastered', 'reason': '"Used" shows basic skill. "Mastered" demonstrates deep expertise.'}
         ],
         'da': [
-            {
-                'weak': 'ansvarlig for',
-                'strong': 'ledede',
-                'reason': '"Ansvarlig for" angiver blot deltagelse, men viser ikke initiativ eller resultater. "Ledede" demonstrerer, at du var drivkraften og beslutningstageren, og viser lederskab og ejerskab.'
-            },
-            {
-                'weak': 'arbejdede på',
-                'strong': 'leverede',
-                'reason': '"Arbejdede på" er vag om dit bidrag. "Leverede" indebærer, at du gennemførte projektet succesfuldt med håndgribelige resultater. Det viser, at du afslutter det, du starter.'
-            }
+            {'weak': 'ansvarlig for', 'strong': 'ledede', 'reason': '"Ansvarlig for" viser deltagelse. "Ledede" demonstrerer, at du var drivkraften.'},
+            {'weak': 'arbejdede på', 'strong': 'leverede', 'reason': '"Arbejdede på" er vag. "Leverede" indebærer succesfuld gennemførelse.'},
+            {'weak': 'deltog i', 'strong': 'ledede', 'reason': '"Deltog i" viser passiv deltagelse. "Ledede" viser initiativ og lederskab.'}
         ]
     }
 
-    suggestions = []
     text_lower = text.lower()
     verb_details = weak_verb_details.get(lang, weak_verb_details['en'])
+    found_verbs = set()
 
     for detail in verb_details:
         weak = detail['weak']
         strong = detail['strong']
         reason = detail['reason']
-        
+
         if weak.lower() in text_lower:
             for line in text.split('\n'):
-                if weak.lower() in line.lower():
+                if weak.lower() in line.lower() and weak.lower() not in found_verbs:
                     improved = line.lower().replace(weak.lower(), strong)
-                    improved = improved[0].upper() + improved[1:] if improved else improved
+                    if improved and len(improved) > 2:
+                        improved = improved[0].upper() + improved[1:]
                     suggestions.append({
                         'id': len(suggestions) + 1,
-                        'original': line.strip(),
-                        'suggested': improved,
+                        'original': line.strip()[:100],
+                        'suggested': improved[:100] if improved else line.strip()[:100],
                         'reason': reason,
                         'type': 'weak_verb',
-                        'priority': 'medium'
+                        'priority': 'high'
                     })
+                    found_verbs.add(weak.lower())
                     break
 
-    # 如果没有找到弱动词，添加量化建议
-    if not suggestions:
-        quantify_reasons = {
-            'zh': '你的简历缺少具体的数字和成果量化。招聘方希望看到"提升了30%"而不是"提升了业绩"。建议添加：完成的项目数量、节省的成本金额、提升的效率百分比、服务的客户数量等具体指标。',
-            'en': 'Your resume lacks specific numbers and quantified achievements. Recruiters want to see "increased by 30%" not just "improved performance". Consider adding: number of projects completed, cost savings amount, efficiency improvement percentage, number of clients served.',
-            'da': 'Dit CV mangler specifikke tal og kvantificerede resultater. Rekrutterere vil se "øget med 30%" ikke bare "forbedret præstation". Overvej at tilføje: antal projekter gennemført, omkostningsbesparelser, effektivitetsforbedring.'
+    # 量化建议
+    quantify_reasons = {
+        'zh': {'no_num': '你的简历缺少具体的数字和成果量化。建议添加：完成的项目数量（X个）、节省的成本金额（X元）、提升的效率百分比（X%）等具体指标，让招聘方直观看到你的价值。', 'with_job': '结合"{}"职位，建议量化：管理的团队规模（X人）、项目预算（X万）、业绩提升（X%）等与职位要求相关的指标。'.format(job_title)},
+        'en': {'no_num': 'Your resume lacks quantified achievements. Add: number of projects, cost savings, efficiency improvement to show measurable value.', 'with_job': 'For "{}" role, quantify: team size (X people), project budget, performance improvement (X%) - metrics relevant to job requirements.'.format(job_title)},
+        'da': {'no_num': 'Dit CV mangler kvantificerbare resultater. Tilføj: antal projekter, omkostningsbesparelser, effektivitetsforbedring.', 'with_job': 'For "{}" stilling, kvantificer: teamstørrelse, projektbudget, præstationsforbedring.'.format(job_title)}
+    }
+    q_texts = quantify_reasons.get(lang, quantify_reasons['en'])
+    suggestions.append({
+        'id': len(suggestions) + 1,
+        'original': '量化成就描述' if lang == 'zh' else 'Quantify achievements',
+        'suggested': '领导X人团队，X个月内完成项目，效率提升X%' if lang == 'zh' else 'Led team of X, delivered in X months, improved efficiency by X%',
+        'reason': q_texts['with_job'] if job_title else q_texts['no_num'],
+        'type': 'quantification',
+        'priority': 'high'
+    })
+
+    # 职位匹配建议
+    if job_title:
+        job_reasons = {
+            'zh': '您的简历与"{}"职位的匹配度可以通过以下方式提升：1) 使用职位描述中的关键词；2) 突出与职位要求最相关的工作经验；3) 强调可迁移技能。'.format(job_title),
+            'en': 'Your match for "{}" can improve by: 1) Using keywords from job description; 2) Highlighting relevant experience; 3) Emphasizing transferable skills.'.format(job_title),
+            'da': 'Din match for "{}" kan forbedres ved at: 1) Bruge nøgleord fra jobbeskrivelsen; 2) Fremhæve relevant erfaring.'.format(job_title)
         }
         suggestions.append({
-            'id': 1,
-            'original': text[:100] + '...' if len(text) > 100 else text,
-            'suggested': text[:100] + '...' if len(text) > 100 else text,
-            'reason': quantify_reasons.get(lang, quantify_reasons['en']),
-            'type': 'missing_quantify',
+            'id': len(suggestions) + 1,
+            'original': '职位关键词匹配' if lang == 'zh' else 'Job keyword matching',
+            'suggested': '在简历中融入职位描述关键词' if lang == 'zh' else 'Integrate job description keywords',
+            'reason': job_reasons.get(lang, job_reasons['en']),
+            'type': 'job_match',
             'priority': 'medium'
         })
+
+    # ATS友好建议
+    ats_reasons = {
+        'zh': 'ATS(简历筛选系统)通常会扫描关键词。请确保简历包含：1) 职位名称中的关键词；2) 技术技能名称；3) 行业术语。这些能大幅提升简历通过初筛的概率。',
+        'en': 'ATS scan for keywords. Ensure your resume includes: 1) Job title keywords; 2) Technical skill names; 3) Industry terminology. This improves initial screening chances.',
+        'da': 'ATS scanner efter nøgleord. Sørg for, at dit CV inkluderer jobtitelnøgleord og tekniske færdighedsnavne.'
+    }
+    suggestions.append({
+        'id': len(suggestions) + 1,
+        'original': 'ATS关键词优化' if lang == 'zh' else 'ATS keyword optimization',
+        'suggested': '添加职位描述中的专业术语和技术关键词' if lang == 'zh' else 'Add professional and technical keywords',
+        'reason': ats_reasons.get(lang, ats_reasons['en']),
+        'type': 'ats_friendly',
+        'priority': 'medium'
+    })
+
+    # 北欧职场文化建议
+    nordic_reasons = {
+        'zh': '在丹麦求职，简历应强调：1) 团队协作和扁平化管理经验；2) 工作与生活平衡的价值观；3) 具体可量化的成果（北欧人喜欢数据）；4) 英语/丹麦语双语能力。',
+        'en': 'For Danish jobs, emphasize: 1) Team collaboration; 2) Work-life balance values; 3) Concrete quantifiable results; 4) English/Danish bilingual ability.',
+        'da': 'For danske job, fremhæv: 1) Teamsamarbejde; 2) Arbejdslivsbalance; 3) Kvantificerbare resultater; 4) Engelsk/dansk tosprogethed.'
+    }
+    suggestions.append({
+        'id': len(suggestions) + 1,
+        'original': '北欧职场文化适配' if lang == 'zh' else 'Nordic workplace culture fit',
+        'suggested': '体现团队协作、平等沟通、成果导向的北欧价值观' if lang == 'zh' else 'Demonstrate team collaboration, equality, results-orientation',
+        'reason': nordic_reasons.get(lang, nordic_reasons['en']),
+        'type': 'culture_fit',
+        'priority': 'medium'
+    })
 
     return suggestions
 
@@ -4254,15 +6179,14 @@ Return a JSON array of discovered skills/experiences:
 
 Return ONLY JSON array with 2-5 items. If no new skills found, return empty array."""
 
-        response = ai_client.chat.completions.create(
-            model=AI_MODEL_RESUME or AI_MODEL,
+        response = smart_ai_request(
             messages=[
                 {"role": "system", "content": "You are a professional career coach. Return only valid JSON."},
                 {"role": "user", "content": prompt}
             ],
+            preferred_provider="groq",
             temperature=0.3,
-            max_tokens=1000,
-            timeout=20
+            max_tokens=1000
         )
 
         content = response.choices[0].message.content.strip()
@@ -4278,21 +6202,46 @@ Return ONLY JSON array with 2-5 items. If no new skills found, return empty arra
 
 @app.post("/api/resume/polish")
 async def polish_resume(request: PolishRequest):
-    """生成逐条精修建议"""
+    """生成逐条精修建议 + 简历亮点总结"""
     try:
         if request.language == "auto":
             lang = detect_language(request.resume_text)
         else:
             lang = request.language
 
-        suggestions = generate_polish_suggestions(request.resume_text, lang)
+        # 构建职位上下文
+        job_context = None
+        if request.job_title or request.job_description:
+            job_context = {
+                "job_title": request.job_title,
+                "job_description": request.job_description,
+                "company": request.company
+            }
+
+        result = generate_polish_suggestions(request.resume_text, lang, job_context, request.resume_structure)
+
+        # 兼容新旧格式（旧版返回list，新版返回dict）
+        if isinstance(result, dict):
+            suggestions = result.get('suggestions', [])
+            resume_highlights = result.get('resume_highlights', [])
+            job_match_score = result.get('job_match_score', 'N/A')
+            recommendation = result.get('recommendation', '')
+        else:
+            suggestions = result
+            resume_highlights = []
+            job_match_score = 'N/A'
+            recommendation = ''
 
         return {
             "success": True,
             "total": len(suggestions),
             "suggestions": suggestions,
+            "resume_highlights": resume_highlights,
+            "job_match_score": job_match_score,
+            "recommendation": recommendation,
             "language": lang,
-            "language_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(lang, "English")
+            "language_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(lang, "English"),
+            "job_context": job_context
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -4442,15 +6391,14 @@ Resume to translate:
 Return ONLY the translated resume text, nothing else."""
 
         try:
-            response = ai_client.chat.completions.create(
-                model=AI_MODEL_RESUME or AI_MODEL,
+            response = smart_ai_request(
                 messages=[
                     {"role": "system", "content": f"You are a professional resume translator specializing in {source_name} to {target_name} translation."},
                     {"role": "user", "content": prompt}
                 ],
+                preferred_provider="groq",
                 temperature=0.3,
-                max_tokens=3000,
-                timeout=60
+                max_tokens=3000
             )
             
             content = response.choices[0].message.content.strip()
@@ -4501,7 +6449,7 @@ async def translate_resume_endpoint(request: TranslateResumeRequest):
                 source_lang,
                 request.target_lang
             )
-            
+
             if translated:
                 return {
                     "success": True,
@@ -4511,8 +6459,26 @@ async def translate_resume_endpoint(request: TranslateResumeRequest):
                     "source_lang_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(source_lang, source_lang),
                     "target_lang_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(request.target_lang, request.target_lang)
                 }
-        
-        # 如果 AI 不可用或翻译失败，返回错误
+
+        # AI 不可用或失败时，使用后备翻译（术语对照表）
+        translated = translate_resume_with_ai(
+            request.resume_text,
+            source_lang,
+            request.target_lang
+        )
+
+        if translated:
+            return {
+                "success": True,
+                "translated_resume": translated,
+                "source_lang": source_lang,
+                "target_lang": request.target_lang,
+                "source_lang_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(source_lang, source_lang),
+                "target_lang_name": {"zh": "中文", "en": "English", "da": "Dansk"}.get(request.target_lang, request.target_lang),
+                "note": "使用基础术语翻译，建议人工校对"
+            }
+
+        # 如果所有翻译都失败，返回错误
         return {
             "success": False,
             "error": "翻译服务暂时不可用，请稍后重试",
@@ -4727,6 +6693,41 @@ async def health_check():
     """健康检查"""
     return {"status": "healthy", "version": "2.0.0", "ai_available": AI_AVAILABLE}
 
+@app.get("/ai/status")
+async def ai_status():
+    """AI 服务状态检查"""
+    return get_ai_status()
+
+@app.post("/ai/check-groq")
+async def check_groq_recovery_endpoint():
+    """手动触发 Groq 配额恢复检测"""
+    recovered = check_groq_recovery()
+    status = get_ai_status()
+    return {
+        "groq_recovered": recovered,
+        **status
+    }
+
+# ===== 后台任务：定期检测 Groq 恢复 =====
+def groq_recovery_checker():
+    """后台线程：每5分钟检测 Groq 配额是否恢复"""
+    import time
+    while True:
+        try:
+            time.sleep(300)  # 5分钟检查一次
+            if not GROQ_AVAILABLE:
+                print("🔄 [Background] 检测 Groq 配额状态...")
+                if check_groq_recovery():
+                    print("✅ [Background] Groq 配额已恢复！")
+        except Exception as e:
+            print(f"⚠️ [Background] Groq 检测出错: {e}")
+
+# 启动后台任务
+if groq_client and openai_client:
+    recovery_thread = threading.Thread(target=groq_recovery_checker, daemon=True)
+    recovery_thread.start()
+    print("✅ [Background] Groq 恢复检测任务已启动（每5分钟）")
+
 # ===== 意见反馈 API =====
 class FeedbackRequest(BaseModel):
     userId: Optional[str] = None
@@ -4889,6 +6890,164 @@ async def render_template(
         return {"success": True, "html": html}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ===== 简历模板AI个性化推荐 =====
+@app.post("/api/resume/template-suggestion")
+async def get_template_suggestion(
+    resume_structure: dict = Body(...),
+    job_description: str = Body(""),
+    job_title: str = Body(""),
+    language: str = Body("en")
+):
+    """
+    AI驱动的简历模板个性化推荐
+    
+    分析用户简历和目标职位，推荐最适合的简历模板
+    """
+    if not AI_AVAILABLE:
+        return {
+            "success": False,
+            "error": "AI服务暂不可用",
+            "suggestions": get_default_template_suggestions(language)
+        }
+    
+    try:
+        # 提取简历关键信息
+        tech_skills = resume_structure.get('skills', {}).get('technical', [])
+        soft_skills = resume_structure.get('skills', {}).get('soft', [])
+        education = resume_structure.get('education', [])
+        experience = resume_structure.get('experience', [])
+        total_years = resume_structure.get('total_experience_years', 0)
+        
+        # 行业判断
+        industry_keywords = {
+            'finance': ['财务', '金融', '会计', '银行', '投资', '财务', 'budget', 'accounting', 'finance', 'banking'],
+            'tech': ['Python', 'Java', '开发', '工程师', '技术', '软件', 'IT', 'developer', 'engineer', 'software', 'data', 'machine learning'],
+            'business': ['管理', '咨询', '运营', '商业', '市场', '销售', 'management', 'consulting', 'operations', 'business', 'marketing'],
+            'creative': ['设计', '创意', 'UX', 'UI', '产品', '品牌', 'design', 'creative', 'UX', 'UI', 'product', 'brand'],
+            'healthcare': ['医疗', '健康', '医院', '生物', '制药', 'healthcare', 'medical', 'hospital', 'pharma'],
+            'education': ['教育', '教师', '学术', '研究', 'education', 'teacher', 'academic', 'research']
+        }
+        
+        detected_industry = 'business'
+        all_text = ' '.join(tech_skills + soft_skills).lower()
+        for industry, keywords in industry_keywords.items():
+            if any(kw.lower() in all_text for kw in keywords):
+                detected_industry = industry
+                break
+        
+        # 构建AI prompt
+        prompt = f"""你是一名专业的简历设计顾问。根据候选人的背景和目标职位，推荐最适合的简历模板风格。
+
+【候选人背景】
+- 行业：{detected_industry}
+- 工作经验：{total_years}年
+- 技术技能：{', '.join(tech_skills[:8]) if tech_skills else '未指定'}
+- 软技能：{', '.join(soft_skills[:5]) if soft_skills else '未指定'}
+- 学历：{len(education)}段
+
+【目标职位】
+{job_title or '未指定'}
+
+【职位描述摘要】
+{job_description[:500] if job_description else '未提供'}
+
+请返回JSON格式的模板推荐（只返回JSON，不要其他内容）：
+{{
+    "recommended_template": "modern/classic/creative 三选一",
+    "confidence": 0.85,
+    "reasoning": "推荐理由，用2-3句话说明为什么这个模板最适合",
+    "alternative_templates": [
+        {{
+            "template": "modern/classic/creative",
+            "reason": "备选理由"
+        }}
+    ],
+    "customization_tips": [
+        "个性化建议1",
+        "个性化建议2"
+    ],
+    "color_suggestion": "深蓝色/绿色/紫色等",
+    "layout_preference": "单栏/双栏"
+}}
+
+【模板风格说明】
+- classic（经典型）：适合金融、咨询、法律、政府等保守行业，深蓝色系，结构清晰
+- modern（现代型）：适合科技、互联网、创业公司，简洁专业，视觉层次分明
+- creative（创意型）：适合设计、媒体、营销、创意行业，色彩丰富，视觉冲击力强</parameter>"""
+        
+        response = smart_ai_request(
+            messages=[
+                {"role": "system", "content": "你是一名专业的简历设计顾问。返回ONLY valid JSON, no markdown, no explanation."},
+                {"role": "user", "content": prompt}
+            ],
+            preferred_provider="groq",
+            temperature=0.3,
+            max_tokens=800
+        )
+        
+        content = response.choices[0].message.content.strip()
+        if content.startswith('```'):
+            content = content.split('```')[1]
+            if content.startswith('json'):
+                content = content[4:]
+        
+        result = json.loads(content)
+        
+        return {
+            "success": True,
+            "suggestions": result,
+            "detected_industry": detected_industry,
+            "total_years": total_years,
+            "skills_count": len(tech_skills) + len(soft_skills)
+        }
+        
+    except Exception as e:
+        print(f"Template suggestion error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "suggestions": get_default_template_suggestions(language)
+        }
+
+
+def get_default_template_suggestions(language: str = "en") -> dict:
+    # Default suggestions when AI is unavailable
+    if language == "zh":
+        return {
+            "recommended_template": "modern",
+            "confidence": 0.5,
+            "reasoning": "推荐使用现代简约型模板，适合大多数职位申请",
+            "alternative_templates": [
+                {"template": "classic", "reason": "传统行业如金融、法律可考虑经典型"},
+                {"template": "creative", "reason": "创意行业如设计、营销可考虑创意型"}
+            ],
+            "customization_tips": [
+                "根据目标公司的行业特点选择模板风格",
+                "保持简历内容简洁有力",
+                "突出与职位相关的技能和经验"
+            ],
+            "color_suggestion": "蓝色",
+            "layout_preference": "单栏"
+        }
+    else:
+        return {
+            "recommended_template": "modern",
+            "confidence": 0.5,
+            "reasoning": "Modern template recommended for most job applications",
+            "alternative_templates": [
+                {"template": "classic", "reason": "Consider classic for finance, law, government"},
+                {"template": "creative", "reason": "Consider creative for design, marketing, media"}
+            ],
+            "customization_tips": [
+                "Choose template style based on target company's industry",
+                "Keep resume content concise and impactful",
+                "Highlight skills and experience relevant to the position"
+            ],
+            "color_suggestion": "Blue",
+            "layout_preference": "Single column"
+        }
 
 
 @app.get("/ats/keywords")
