@@ -118,19 +118,18 @@ export async function onRequest(context) {
         body: body,
       });
       
+      // 直接传递后端的响应头（包括 CORS 头），不覆盖
       const responseBody = await response.arrayBuffer();
+      const responseHeaders = Object.fromEntries(response.headers.entries());
       
       return new Response(responseBody, {
         status: response.status,
-        headers: {
-          ...Object.fromEntries(response.headers.entries()),
-          'Access-Control-Allow-Origin': '*',
-        }
+        headers: responseHeaders
       });
     } catch (error) {
       return new Response(JSON.stringify({ error: 'Backend unavailable', details: error.message }), {
         status: 503,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: { 'Content-Type': 'application/json' }
       });
     }
   }

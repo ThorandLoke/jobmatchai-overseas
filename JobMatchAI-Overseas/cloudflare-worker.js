@@ -75,8 +75,8 @@ export default {
 
       const responseBody = await response.arrayBuffer();
 
-      const responseHeaders = new Headers(response.headers);
-      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      // 直接使用后端的响应头（包括 CORS 头）
+      const responseHeaders = Object.fromEntries(response.headers.entries());
 
       return new Response(responseBody, {
         status: response.status,
@@ -89,8 +89,7 @@ export default {
       }), {
         status: 503,
         headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
+          'Content-Type': 'application/json'
         }
       });
     }
