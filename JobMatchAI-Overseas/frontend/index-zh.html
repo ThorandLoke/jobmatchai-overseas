@@ -4851,7 +4851,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             try {
                 console.log('[学习资源] 预获取学习资源，技能:', skills);
-                const res = await fetch(API_BASE + '/learning/recommend', {
+                const res = await fetch(API_BASE + '/api/learning/recommend', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -4882,7 +4882,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
 
             showToast('📚 正在为您匹配学习资源...');
             try {
-                const res = await fetch(API_BASE + '/learning/recommend', {
+                const res = await fetch(API_BASE + '/api/learning/recommend', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ missing_skills: missingSkills, job_title: jobTitle })
@@ -6049,7 +6049,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             // 没有缓存，调用API
             console.log('[学习资源] 无缓存，调用API获取');
-            fetch(API_BASE + '/learning/recommend', {
+            fetch(API_BASE + '/api/learning/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
