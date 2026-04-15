@@ -32,7 +32,7 @@ def get_ai_client():
     return None
 
 
-async def ai_generate_resources(skill: str, job_title: str = "") -> dict:
+async def ai_generate_resources(skill: str, job_title: str = "", lang: str = 'zh') -> dict:
     """
     用 AI 为未知技能动态生成学习资源（搜索页 URL 格式，不生成具体课程链接）
     """
@@ -40,7 +40,8 @@ async def ai_generate_resources(skill: str, job_title: str = "") -> dict:
     if not smart_ai:
         return None
 
-    prompt = f"""你是一个职业发展顾问，需要为求职者推荐学习资源。
+    if lang == 'zh':
+        prompt = f"""你是一个职业发展顾问，需要为求职者推荐学习资源。
 
 目标职位：{job_title or '未知'}
 需要提升的技能：{skill}
@@ -70,6 +71,38 @@ async def ai_generate_resources(skill: str, job_title: str = "") -> dict:
     {{"title": "LinkedIn Learning - {skill}", "type": "在线课", "url": "https://www.linkedin.com/learning/topics/{skill}", "desc": "简短说明", "level": "进阶", "price_hint": "月订阅"}}
   ]
 }}"""
+    else:
+        # English prompt - no Bilibili
+        prompt = f"""You are a career development advisor helping job seekers find learning resources.
+
+Target position: {job_title or 'Unknown'}
+Skill to improve: {skill}
+
+Generate a JSON with learning resource recommendations:
+1. free array: 3-4 free resources (YouTube, Coursera, edX, Khan Academy)
+2. paid array: 2 paid resources (Udemy, LinkedIn Learning)
+3. Use search page URLs only (no specific course links, they expire easily):
+   - YouTube: https://www.youtube.com/results?search_query=SKILL
+   - Coursera: https://www.coursera.org/search?query=SKILL
+   - edX: https://www.edx.org/search?q=SKILL
+   - Khan Academy: https://www.khanacademy.org/search?search_query=SKILL
+   - Udemy: https://www.udemy.com/topic/SKILL/
+   - LinkedIn Learning: https://www.linkedin.com/learning/topics/SKILL
+
+Return JSON only, no other text:
+{{
+  "category": "category-name-lowercase",
+  "industry": "industry-name",
+  "free": [
+    {{"title": "YouTube - {skill} Tutorial", "type": "Video", "url": "https://www.youtube.com/results?search_query={skill}+tutorial", "desc": "Brief description", "level": "Beginner"}},
+    {{"title": "Coursera - {skill}", "type": "Course", "url": "https://www.coursera.org/search?query={skill}", "desc": "Brief description", "level": "Beginner"}},
+    {{"title": "edX - {skill}", "type": "Course", "url": "https://www.edx.org/search?q={skill}", "desc": "Brief description", "level": "Beginner"}}
+  ],
+  "paid": [
+    {{"title": "Udemy - {skill} Course", "type": "Online Course", "url": "https://www.udemy.com/topic/{skill}/", "desc": "Brief description", "level": "Intermediate", "price_hint": "$10-20"}},
+    {{"title": "LinkedIn Learning - {skill}", "type": "Online Course", "url": "https://www.linkedin.com/learning/topics/{skill}", "desc": "Brief description", "level": "Intermediate", "price_hint": "Monthly subscription"}}
+  ]
+}}"""
 
     try:
         response = smart_ai(
@@ -94,7 +127,7 @@ async def ai_generate_resources(skill: str, job_title: str = "") -> dict:
             "ai_generated": True
         }
     except Exception as e:
-        print(f"[AI Learning] 生成失败 for '{skill}': {e}")
+        print(f"[AI Learning] Generation failed for '{skill}': {e}")
         return None
 
 router = APIRouter(prefix="/learning", tags=["智能学习推荐"])
@@ -489,8 +522,15 @@ def match_skill_to_category(skill: str) -> Optional[str]:
     return None
 
 
-def get_resources_for_skill(skill: str) -> dict:
-    """获取单个技能的学习资源（查硬编码数据库）"""
+def get_resources_for_skill(skill: str, lang: str = 'zh') -> dict:
+    """获取单个技能的学习资源（查硬编码数据库）
+    
+    注意：英文模式时跳过硬编码数据库，返回 None 让 AI 生成英文资源
+    """
+    # 英文模式：跳过硬编码中文数据库，让 AI 生成英文资源
+    if lang != 'zh':
+        return None
+    
     category = match_skill_to_category(skill)
 
     if category and category in LEARNING_DATABASE:
@@ -583,17 +623,13 @@ async def recommend_learning(req: LearningRecommendRequest):
     recommendations = []
     ai_needed = []   # 需要 AI 处理的技能
 
-    # 第一轮：查硬编码数据库
+    # 第一轮：查硬编码数据库（中文模式）或跳过（英文模式）
     for skill in req.missing_skills:
         skill_clean = re.sub(r'[\s\-–—]+', ' ', skill.strip())
         if len(skill_clean) < 2:
             continue
-        rec = get_resources_for_skill(skill_clean)
+        rec = get_resources_for_skill(skill_clean, req.language or 'zh')
         if rec:
-            # English mode: remove Bilibili from hardcoded results
-            if req.language != 'zh':
-                rec['free'] = [r for r in rec.get('free', []) if 'bilibili' not in r.get('url', '').lower()]
-                rec['paid'] = [r for r in rec.get('paid', []) if 'bilibili' not in r.get('url', '').lower()]
             recommendations.append(rec)
         else:
             ai_needed.append(skill_clean)
@@ -601,17 +637,14 @@ async def recommend_learning(req: LearningRecommendRequest):
     # 第二轮：AI 批量生成未命中的技能
     if ai_needed:
         import asyncio
-        tasks = [ai_generate_resources(skill, req.job_title or "") for skill in ai_needed]
+        tasks = [ai_generate_resources(skill, req.job_title or "", req.language or 'zh') for skill in ai_needed]
         ai_results = await asyncio.gather(*tasks)
         for skill, result in zip(ai_needed, ai_results):
             if result:
-                # English mode: remove Bilibili from AI results
-                if req.language != 'zh':
-                    result['free'] = [r for r in result.get('free', []) if 'bilibili' not in r.get('url', '').lower()]
                 recommendations.append(result)
             else:
-                # AI 也失败了 → 用搜索链接兜底（传入语言参数）
-                recommendations.append(get_fallback_resources(skill, req.language or 'en'))
+                # AI 也失败了 → 用搜索链接兜底
+                recommendations.append(get_fallback_resources(skill, req.language or 'zh'))
 
     # AI 总结
     industries = [r.get("industry", "") for r in recommendations if r.get("industry")]
