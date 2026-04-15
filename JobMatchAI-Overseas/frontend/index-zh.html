@@ -6212,19 +6212,24 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             // 1. 从 recommendations 提取技能差距列表（使用短技能名）
             const skillGapsAddressed = recs.map(r => r.skill).filter(Boolean);
             
-            // 2. 从 recommendations 提取所有免费资源
+            // 2. 从 recommendations 提取所有免费资源和B站资源
             const allFreeResources = [];
             const chineseResources = []; // B站资源单独存放
             recs.forEach(r => {
+                // B站资源在 r.chinese 字段
+                if (r.chinese && Array.isArray(r.chinese)) {
+                    r.chinese.forEach(res => {
+                        chineseResources.push({
+                            ...res,
+                            skill: r.skill // 关联到技能
+                        });
+                    });
+                }
+                // 免费资源在 r.free 字段
                 if (r.free && Array.isArray(r.free)) {
                     r.free.forEach(res => {
-                        // 检查是否是B站资源
-                        if (res.url && res.url.includes('bilibili.com')) {
-                            chineseResources.push({
-                                ...res,
-                                skill: r.skill // 关联到技能
-                            });
-                        } else {
+                        // 排除B站资源（已在 chineseResources 中）
+                        if (!res.url || !res.url.includes('bilibili.com')) {
                             allFreeResources.push({
                                 ...res,
                                 skill: r.skill // 关联到技能
