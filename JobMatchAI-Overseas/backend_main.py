@@ -286,15 +286,16 @@ def identify_critical_requirements_fallback(job_description: str, resume_text: s
 def get_chinese_learning_resources_ai(skills: List[str], lang: str = 'zh') -> List[Dict]:
     """
     使用AI根据技能列表动态获取国内学习资源
-    
+
     Args:
         skills: 需要学习的技能列表
         lang: 语言偏好
-    
+
     Returns:
-        国内学习资源列表（B站、中国大学MOOC）
+        国内学习资源列表（B站），仅当 lang='zh' 时返回
     """
-    if not skills:
+    # 英文用户不返回中文资源
+    if lang != 'zh' or not skills:
         return []
     
     if not AI_AVAILABLE:
