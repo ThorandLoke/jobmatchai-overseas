@@ -1216,6 +1216,7 @@ def parse_resume_structure(text: str, lang: str = 'en') -> Dict:
 4. 技能要分类为 technical（技术技能）、soft（软技能）、language（语言能力）
 5. 如果无法从文本中确定某个字段，返回空字符串或空数组
 6. 工作经验从最早的工作开始算起
+7. 语言检测：根据简历的主要内容语言判断，返回 zh（中文）、en（英文）、da（丹麦文）之一
 
 【输出格式 - 必须严格返回有效JSON】
 {{
@@ -1248,7 +1249,8 @@ def parse_resume_structure(text: str, lang: str = 'en') -> Dict:
     "soft": ["软技能1", "技能2"],
     "language": ["语言能力1（含等级）", "语言能力2"]
   }},
-  "total_experience_years": 总工作年限（数字，保留一位小数）
+  "total_experience_years": 总工作年限（数字，保留一位小数）,
+  "detected_language": "语言代码（zh/en/da，根据简历主要语言判断）"
 }}
 
 简历文本：
@@ -1308,6 +1310,7 @@ Resume text:
 4. Kompetencer skal kategoriseres som: technical (værktøjer/sprog), soft (interpersonlig), language (med niveau)
 5. Hvis et felt ikke kan bestemmes fra teksten, returner tom streng eller tom array
 6. Erfaring skal starte fra det tidligste job
+7. Sprogregistrering: Baseret på CV'ets hovedsproglige indhold, returner zh (kinesisk), en (engelsk) eller da (dansk)
 
 【Output Format - Returner kun gyldig JSON】
 {{
@@ -1340,7 +1343,8 @@ Resume text:
     "soft": ["Blød kompetence 1", "Kompetence 2"],
     "language": ["Sprog (niveau)", "Sprog 2"]
   }},
-  "total_experience_years": samlede_år (tal, én decimal)
+  "total_experience_years": samlede_år (tal, én decimal),
+  "detected_language": "Sprogkode (zh/en/da, baseret på CV'ets hovedsprog)"
 }}
 
 CV tekst:
@@ -1390,8 +1394,13 @@ CV tekst:
             result['experience'] = []
         if 'skills' not in result:
             result['skills'] = {'technical': [], 'soft': [], 'language': []}
+
+        # 优先使用 AI 检测的语言（更准确），否则用硬编码结果
+        if 'detected_language' in result and result['detected_language'] in ['zh', 'en', 'da']:
+            result['detected_language'] = result['detected_language']
+        else:
+            result['detected_language'] = lang
         
-        result['detected_language'] = lang
         result['ai_enhanced'] = True
         
         return result
@@ -2426,7 +2435,7 @@ def read_root(request: Request):
         frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-zh.html")
     else:
         # 其他地区IP（丹麦、欧洲等）→ 英文版（目前内容也是中文）
-        frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en-final.html")
+        frontend_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en.html")
     
     if os.path.exists(frontend_path):
         return FileResponse(frontend_path)
@@ -2443,7 +2452,7 @@ def read_beta_page():
 @app.get("/en")
 def read_english_page():
     """返回英文版页面"""
-    en_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en-final.html")
+    en_path = os.path.join(os.path.dirname(__file__), "frontend", "index-en.html")
     if os.path.exists(en_path):
         return FileResponse(en_path)
     return {"error": "English page not found"}
@@ -6752,7 +6761,7 @@ async def app_page():
 @app.get("/app-en")
 async def app_en_page():
     """Frontend page - English version"""
-    return FileResponse(os.path.join(FRONTEND_DIR, "index-en-final.html"))
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-en.html"))
 
 @app.get("/app-zh")
 async def app_zh_page():
