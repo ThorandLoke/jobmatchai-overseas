@@ -663,6 +663,8 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 <div id="analysisContent"></div>
             </div>
             
+
+            
             <!-- 简历精修界面 -->
             <div id="polishContainer" class="card hidden">
                 <h2>✨ 简历精修 <span id="polishProgress" style="font-size: 0.9rem; color: #ccc;"></span></h2>
@@ -1751,10 +1753,23 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             btn.textContent = '🔄 分析中...';
             loadingDiv.classList.remove('hidden');
             
-            // 先获取职位上下文（用于进度消息）
-            const jobTitle = document.getElementById('manualJobTitle')?.value || '';
-            const jobDesc = document.getElementById('manualJobDesc')?.value || '';
-            const company = document.getElementById('manualCompany')?.value || '';
+            // 获取职位上下文（优先级：手动输入区 > currentTargetJob > fetchedJobData）
+            let jobTitle = document.getElementById('manualJobTitle')?.value || '';
+            let jobDesc = document.getElementById('manualJobDesc')?.value || '';
+            let company = document.getElementById('manualCompany')?.value || '';
+            
+            // 如果手动输入区为空，尝试使用全局职位数据
+            if (!jobTitle && !jobDesc) {
+                if (window.currentTargetJob) {
+                    jobTitle = window.currentTargetJob.title || '';
+                    jobDesc = window.currentTargetJob.description || '';
+                    company = window.currentTargetJob.company || '';
+                } else if (window.fetchedJobData) {
+                    jobTitle = window.fetchedJobData.title || '';
+                    jobDesc = window.fetchedJobData.description || '';
+                    company = window.fetchedJobData.company || '';
+                }
+            }
             
             // 模拟进度条动画
             let progress = 0;
@@ -1814,9 +1829,24 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         // 同步结构化数据到 window 对象（供学习资源 Tab 使用）
                         window.resumeStructure = currentResumeStructure;
                         window.jobDescription = data.analysis?.job_context?.job_description || 
-                                                 document.getElementById('manualJobDesc')?.value || '';
+                                                 document.getElementById('manualJobDesc')?.value || 
+                                                 window.currentTargetJob?.description ||
+                                                 window.fetchedJobData?.description || '';
                         window.jobTitle = data.analysis?.job_context?.job_title || 
-                                          document.getElementById('manualJobTitle')?.value || '';
+                                          document.getElementById('manualJobTitle')?.value || 
+                                          window.currentTargetJob?.title ||
+                                          window.fetchedJobData?.title || '';
+                        window.missingSkills = data.analysis?.missing_skills || [];
+                        window.criticalGaps = data.analysis?.critical_gaps || [];
+                        window.matchedSkills = data.analysis?.matched_skills || [];
+                        window.skillMatchScore = data.analysis?.job_match_score || 50;
+                        
+                        // 提取技能关键词（从 missing_skills 长描述中提取核心词，供学习资源搜索用）
+                        window.missingSkillsKeywords = extractSkillKeywords(window.missingSkills);
+                        
+                        // 同时获取学习资源（不显示，等待用户切换到学习资源 Tab）
+                        fetchAndCacheLearningRecommendations();
+                        
                         renderAnalysisResult(data.analysis);
                         if (data.search_suggestions) {
                             window.searchSuggestionsData = data.search_suggestions;
@@ -1837,6 +1867,91 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 showToast('❌ 分析失败');
                 console.error(e);
             }
+        }
+        
+        // 从长技能描述中提取关键词
+        function extractSkillKeywords(skills) {
+            if (!skills || !Array.isArray(skills)) return [];
+            
+            // 常见技能关键词映射
+            const skillMappings = {
+                'erp': 'ERP',
+                'sap': 'SAP',
+                'oracle': 'Oracle',
+                'microsoft dynamics': 'Microsoft Dynamics',
+                'dynamics': 'Dynamics',
+                'training': 'Training',
+                'support': 'IT Support',
+                'it support': 'IT Support',
+                'documentation': 'Documentation',
+                'escalation': 'Escalation',
+                'system administration': 'System Administration',
+                'sql': 'SQL',
+                'database': 'Database',
+                'project management': 'Project Management',
+                'change management': 'Change Management',
+                'user training': 'User Training',
+                'process improvement': 'Process Improvement',
+                'business analysis': 'Business Analysis',
+                'stakeholder': 'Stakeholder Management',
+                'communication': 'Communication',
+                'analysis': 'Analysis',
+                'modernizing': 'Modernization',
+                'modernization': 'Modernization',
+                'integration': 'Integration',
+                'controlling': 'Control',
+                'control': 'Control',
+                'business control': 'Business Control'
+            };
+            
+            const keywords = [];
+            const seen = new Set();
+            
+            skills.forEach(skill => {
+                const lower = skill.toLowerCase();
+                let found = false;
+                
+                // 检查是否是纯中文技能（不需要提取，直接使用）
+                const isChinese = /^[\u4e00-\u9fa5]+$/.test(skill);
+                if (isChinese && skill.length >= 2 && skill.length <= 6) {
+                    // 中文技能名长度合适（2-6个汉字），直接使用
+                    if (!seen.has(skill)) {
+                        keywords.push(skill);
+                        seen.add(skill);
+                    }
+                    return;
+                }
+                
+                // 先检查精确匹配
+                for (const [key, value] of Object.entries(skillMappings)) {
+                    if (lower.includes(key) && !seen.has(value)) {
+                        keywords.push(value);
+                        seen.add(value);
+                        found = true;
+                        break;
+                    }
+                }
+                
+                // 如果没有匹配到，尝试提取前几个重要单词
+                if (!found) {
+                    const words = skill.split(/\s+/);
+                    // 取前 2 个有意义的词（排除介词和冠词）
+                    const stopWords = ['a', 'an', 'the', 'to', 'for', 'of', 'in', 'on', 'and', 'or', 'with', 'that', 'ensure', 'acting', 'providing', 'taking', 'responsibility', 'the'];
+                    const importantWords = words.filter(w => 
+                        w.length > 2 && !stopWords.includes(w.toLowerCase())
+                    ).slice(0, 2);
+                    
+                    if (importantWords.length > 0) {
+                        const keyword = importantWords.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                        if (!seen.has(keyword)) {
+                            keywords.push(keyword);
+                            seen.add(keyword);
+                        }
+                    }
+                }
+            });
+            
+            return keywords.slice(0, 5); // 最多返回 5 个关键词
         }
         
         // 渲染分析结果
@@ -4117,15 +4232,17 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         
         // 更新职位选择下拉框
         function updateJobSelect() {
+            // 更新求职信 Tab 的下拉框
             const select = document.getElementById('selectJob');
-            select.innerHTML = '<option value="">-- 选择已保存的职位 --</option>';
-            
-            savedJobs.forEach((job, index) => {
-                const option = document.createElement('option');
-                option.value = index;
-                option.textContent = `${job.title} @ ${job.company}`;
-                select.appendChild(option);
-            });
+            if (select) {
+                select.innerHTML = '<option value="">-- 选择已保存的职位 --</option>';
+                savedJobs.forEach((job, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = `${job.title} @ ${job.company}`;
+                    select.appendChild(option);
+                });
+            }
         }
         
         // 显示/隐藏主动求职选项
@@ -4473,6 +4590,13 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             renderSavedJobs();
             updateJobSelect();
             
+            // 设置 currentTargetJob（和 fetchedJobData 类似的全局状态，供技能匹配使用）
+            window.currentTargetJob = {
+                title: title,
+                company: company,
+                description: description
+            };
+            
             // 切换到求职信页面
             document.getElementById('coverTab').classList.remove('hidden');
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -4496,6 +4620,14 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             savedJobs.push(job);
             renderSavedJobs();
             updateJobSelect();
+            
+            // 设置 currentTargetJob（供技能匹配使用）
+            window.currentTargetJob = {
+                title: title,
+                company: company,
+                description: description
+            };
+            
             showToast('✅ 职位已保存');
         }
         
@@ -4581,19 +4713,26 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         }
 
         async function extractAndMatch() {
-            const text = document.getElementById('extractResumeText').value;
-            const jobDesc = document.getElementById('extractJobDesc').value;
-            const selectedJob = document.getElementById('extractSelectJob').value;
+            // 使用已分析的简历内容
+            const text = currentResume || document.getElementById('resumeText')?.value || '';
+            if (!text.trim()) { showToast('⚠️ 请先上传或粘贴简历'); return; }
 
-            if (!text.trim()) { showToast('⚠️ 请先粘贴简历内容'); return; }
-
+            // 优先级：fetchedJobData（搜索结果）> currentTargetJob（申请此职位）> savedJobs（已保存职位）
             let jobData = null;
-            if (selectedJob !== '' && savedJobs[selectedJob]) {
-                jobData = savedJobs[selectedJob];
-            } else if (jobDesc.trim()) {
-                jobData = { title: '目标职位', description: jobDesc, company: '' };
-            } else {
-                showToast('⚠️ 请选择职位或粘贴职位描述');
+            
+            if (window.fetchedJobData) {
+                // 优先使用当前搜索/查看的职位
+                jobData = window.fetchedJobData;
+            } else if (window.currentTargetJob) {
+                jobData = window.currentTargetJob;
+            } else if (savedJobs.length > 0) {
+                // 最后才使用已保存的职位
+                jobData = savedJobs[savedJobs.length - 1];
+            }
+            
+            if (!jobData || (!jobData.title && !jobData.description)) {
+                showToast('⚠️ 请先搜索或提供职位信息');
+                switchTab('search');
                 return;
             }
 
@@ -4605,12 +4744,30 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 const res = await fetch(API_BASE + '/extract/match', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.success) {
-                    renderMatchResult(data.match, jobData);
+                    // 🔄 更新 window.currentAnalysis（用于触发职位匹配度卡片 + 学习资源 Tab）
+                    const jobContext = {
+                        job_title: jobData.title || '',
+                        job_description: jobData.description || '',
+                        company: jobData.company || ''
+                    };
+                    
+                    if (!window.currentAnalysis) {
+                        window.currentAnalysis = {};
+                    }
+                    window.currentAnalysis.job_match_score = data.match.overall_score || 50;
+                    window.currentAnalysis.matched_skills = data.match.matched_skills || [];
+                    window.currentAnalysis.missing_skills = data.match.missing_skills || [];
+                    window.currentAnalysis.job_context = jobContext;
+                    
+                    window.jobDescription = jobData.description || '';
+                    window.jobTitle = jobData.title || '';
+                    
+                    // 🔄 重新渲染职位匹配度卡片（和粘贴职位流程一致）
+                    renderAnalysisResult(window.currentAnalysis);
+                    
                     // 🎯 自动加载缺失技能的定制学习推荐
                     if (data.match && data.match.missing_skills && data.match.missing_skills.length > 0) {
                         fetchLearningRecommendations(data.match.missing_skills, jobData.title || '');
-                    } else {
-                        hideLearningSection();
                     }
                     showToast('✅ 匹配分析完成！');
                 } else { showToast('❌ 匹配失败: ' + data.error); }
@@ -4674,6 +4831,51 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         }
 
         // ===== 🎓 智能学习推荐 =====
+        
+        // 预获取并缓存学习资源（精修简历 Tab 分析完成后调用）
+        async function fetchAndCacheLearningRecommendations() {
+            // 使用已提取的短技能名
+            const skills = window.missingSkillsKeywords || 
+                          (window.criticalGaps || []).map(g => g.skill).filter(Boolean) ||
+                          window.missingSkills || [];
+            
+            if (skills.length === 0) {
+                console.log('[学习资源] 无缺失技能，跳过预获取');
+                return;
+            }
+            
+            const jobTitle = window.jobTitle || 
+                             window.currentAnalysis?.job_context?.job_title || '';
+            
+            const lang = window.detectedLanguage || 'en';
+            
+            try {
+                console.log('[学习资源] 预获取学习资源，技能:', skills);
+                const res = await fetch(API_BASE + '/learning/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        missing_skills: skills, 
+                        job_title: jobTitle,
+                        language: lang
+                    })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    // 缓存到 window 对象，供学习资源 Tab 直接使用
+                    window.cachedLearningData = data;
+                    console.log(`[学习资源] 已缓存 ${data.recommendations?.length || 0} 个技能的学习资源`);
+                } else {
+                    console.log('[学习资源] 预获取失败:', data.error);
+                    window.cachedLearningData = null;
+                }
+            } catch (e) {
+                console.log('[学习资源] 预获取异常:', e);
+                window.cachedLearningData = null;
+            }
+        }
+        
         async function fetchLearningRecommendations(missingSkills, jobTitle) {
             const card = document.getElementById('extractResultCard');
             let section = document.getElementById('learningRecSection');
@@ -5108,7 +5310,6 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 // 尝试自动填充当前职位信息
                 autoFillCurrentJob();
             }
-            if (tab === 'extract') { updateExtractJobSelect(); }
             if (tab === 'tracker') { initTrackerTab(); }
             if (tab === 'payment') { initPaymentTab(); }
             if (tab === 'learning') { loadLearningRecommendations(); }
@@ -5351,17 +5552,6 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             document.getElementById('searchJobDesc').value = '';
             document.getElementById('currentJobInfo').classList.add('hidden');
             showToast('已清除职位信息');
-        }
-
-        function updateExtractJobSelect() {
-            const select = document.getElementById('extractSelectJob');
-            select.innerHTML = '<option value="">-- 从已保存职位中选择 --</option>';
-            savedJobs.forEach((job, i) => {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = `${job.title} @ ${job.company}`;
-                select.appendChild(opt);
-            });
         }
 
         // ===== 付费系统功能 =====
@@ -5818,8 +6008,10 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 }
             }
             
-            // 检查是否有简历和职位数据
-            if (!window.resumeStructure || !window.jobDescription) {
+            // 检查是否有数据可以用（满足任一条件即可）
+            const hasMissingSkills = window.missingSkills && window.missingSkills.length > 0;
+            const hasJobAndResume = window.resumeStructure && window.jobDescription;
+            if (!hasMissingSkills && !hasJobAndResume) {
                 emptyState.classList.remove('hidden');
                 loadingState.classList.add('hidden');
                 resultsDiv.classList.add('hidden');
@@ -5835,23 +6027,35 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const lang = window.detectedLanguage || 'en';
             
             // 获取技能差距数据（如果有）
-            let skillGap = {
-                missing_skills: window.missingSkills || [],
-                critical_gaps: window.criticalGaps || [],
-                matched_skills: window.matchedSkills || [],
-                score: window.skillMatchScore || 50,
-                job_title: window.jobTitle || ''
-            };
+            // 使用 extractSkillKeywords 函数从长描述中提取短技能名
+            let missingSkillsRaw = window.missingSkills || 
+                                  (window.criticalGaps || []).map(g => g.skill).filter(Boolean) ||
+                                  [];
             
-            // 调用API
-            fetch(API_BASE + '/api/learning/recommend', {
+            // 从长技能描述中提取核心关键词（短技能名）
+            const missingSkills = extractSkillKeywords(missingSkillsRaw);
+            
+            const jobTitle = window.jobTitle || 
+                             window.currentAnalysis?.job_context?.job_title || '';
+            
+            // 优先使用缓存的学习资源数据
+            if (window.cachedLearningData) {
+                console.log('[学习资源] 使用缓存数据');
+                loadingState.classList.add('hidden');
+                displayLearningRecommendations(window.cachedLearningData);
+                resultsDiv.classList.remove('hidden');
+                return;
+            }
+            
+            // 没有缓存，调用API
+            console.log('[学习资源] 无缓存，调用API获取');
+            fetch(API_BASE + '/learning/recommend', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    resume_structure: window.resumeStructure,
-                    job_description: window.jobDescription,
-                    skill_gap: skillGap,
-                    lang: lang
+                    missing_skills: missingSkills,
+                    job_title: jobTitle,
+                    language: lang
                 })
             })
             .then(res => res.json())
@@ -5859,6 +6063,8 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                 loadingState.classList.add('hidden');
                 
                 if (data.success) {
+                    // 缓存数据供后续使用
+                    window.cachedLearningData = data;
                     displayLearningRecommendations(data);
                     resultsDiv.classList.remove('hidden');
                 } else {
@@ -5874,40 +6080,91 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         }
         
         function displayLearningRecommendations(data) {
-            // 显示摘要
-            const summaryText = document.getElementById('learningSummaryText');
-            summaryText.textContent = data.summary || '根据您的简历和目标职位，我们为您推荐以下学习资源：';
+            // ========== 数据格式兼容处理 ==========
+            // 后端返回 recommendations 数组，前端期望 chinese_resources/free_resources/paid_resources/skill_gaps_addressed
+            // 这里做数据转换
+            const recs = data.recommendations || [];
             
-            // 显示技能差距标签
+            // 1. 从 recommendations 提取技能差距列表（使用短技能名）
+            const skillGapsAddressed = recs.map(r => r.skill).filter(Boolean);
+            
+            // 2. 从 recommendations 提取所有免费资源
+            const allFreeResources = [];
+            const chineseResources = []; // B站资源单独存放
+            recs.forEach(r => {
+                if (r.free && Array.isArray(r.free)) {
+                    r.free.forEach(res => {
+                        // 检查是否是B站资源
+                        if (res.url && res.url.includes('bilibili.com')) {
+                            chineseResources.push({
+                                ...res,
+                                skill: r.skill // 关联到技能
+                            });
+                        } else {
+                            allFreeResources.push({
+                                ...res,
+                                skill: r.skill // 关联到技能
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // 3. 从 recommendations 提取所有付费资源
+            const allPaidResources = [];
+            recs.forEach(r => {
+                if (r.paid && Array.isArray(r.paid)) {
+                    r.paid.forEach(res => {
+                        allPaidResources.push({
+                            ...res,
+                            skill: r.skill // 关联到技能
+                        });
+                    });
+                }
+            });
+            
+            // 4. 生成摘要
+            const summaryText = data.ai_summary || data.summary || 
+                `根据您的求职目标，我们为您推荐以下学习资源来提升：${skillGapsAddressed.join('、')}`;
+            
+            // 显示摘要
+            const summaryDiv = document.getElementById('learningSummaryText');
+            if (summaryDiv) {
+                summaryDiv.textContent = summaryText;
+            }
+            
+            // 显示技能差距标签（使用短技能名）
             const skillGapsList = document.getElementById('skillGapsList');
-            const gaps = data.skill_gaps_addressed || [];
-            if (gaps.length > 0) {
-                skillGapsList.innerHTML = gaps.map(skill => 
-                    `<span style="padding:6px 12px;background:rgba(255,107,107,0.2);border:1px solid rgba(255,107,107,0.4);border-radius:20px;color:#ff6b6b;font-size:0.85rem;">${skill}</span>`
-                ).join('');
-            } else {
-                skillGapsList.innerHTML = '<span style="color:#6fcf97;">🎉 您的技能与职位匹配度很高！</span>';
+            if (skillGapsList) {
+                if (skillGapsAddressed.length > 0) {
+                    skillGapsList.innerHTML = skillGapsAddressed.map(skill => 
+                        `<span style="padding:6px 12px;background:rgba(255,107,107,0.2);border:1px solid rgba(255,107,107,0.4);border-radius:20px;color:#ff6b6b;font-size:0.85rem;">${skill}</span>`
+                    ).join('');
+                } else {
+                    skillGapsList.innerHTML = '<span style="color:#6fcf97;">🎉 您的技能与职位匹配度很高！</span>';
+                }
             }
             
             // 1. 优先显示B站中文资源（最高优先级）
             const chineseSection = document.getElementById('chineseResourcesSection');
             const chineseList = document.getElementById('chineseResourcesList');
             const otherSection = document.getElementById('otherResourcesSection');
-            if (data.chinese_resources && data.chinese_resources.length > 0) {
+            
+            // 使用从 recommendations 提取的 chineseResources
+            if (chineseResources.length > 0) {
                 chineseSection.classList.remove('hidden');
                 // 同时显示"其他资源"（MOOC主页，固定卡片）
                 if (otherSection) otherSection.classList.remove('hidden');
-                chineseList.innerHTML = data.chinese_resources.map(res => `
+                chineseList.innerHTML = chineseResources.map(res => `
                     <a href="${res.url}" target="_blank" style="display:block;padding:14px;background:rgba(251,114,153,0.12);border:2px solid rgba(251,114,153,0.4);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" 
                        onmouseover="this.style.borderColor='rgba(251,114,153,0.8)'" 
                        onmouseout="this.style.borderColor='rgba(251,114,153,0.4)'">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                             <span style="font-size:1.1rem;">🎬</span>
                             <span style="color:#fb7299;font-weight:600;">${res.title}</span>
-                            <span style="background:rgba(251,114,153,0.25);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#fb7299;">${res.difficulty || '视频'}</span>
+                            <span style="background:rgba(251,114,153,0.25);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#fb7299;">${res.level || '视频'}</span>
                         </div>
-                        <div style="color:#ccc;font-size:0.8rem;margin-bottom:4px;">${res.provider} · ${res.duration || '视频合集'}</div>
-                        <div style="color:#aaa;font-size:0.75rem;">🔍 点击在B站搜索「${res.skill || ''}」相关教程</div>
+                        <div style="color:#aaa;font-size:0.75rem;">🔍 技能：${res.skill || ''}</div>
                     </a>
                 `).join('');
             } else {
@@ -5917,52 +6174,65 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             // 2. 显示免费国际资源
             const freeList = document.getElementById('freeResourcesList');
-            const freeResources = data.free_resources || [];
-            freeList.innerHTML = freeResources.length > 0 ? freeResources.map(res => `
-                <div class="resource-item" data-url="${res.url}" style="position:relative;">
-                    <a href="${res.url}" target="_blank" style="display:block;padding:14px;background:rgba(107,207,127,0.1);border:1px solid rgba(107,207,127,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" 
-                       onmouseover="this.style.borderColor='rgba(107,207,127,0.6)'" 
-                       onmouseout="this.style.borderColor='rgba(107,207,127,0.3)'">
-                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-                            <span style="font-size:0.9rem;">📚</span>
-                            <span style="color:#6fcf97;font-weight:600;">${res.title}</span>
-                            <span style="background:rgba(107,207,127,0.3);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#6fcf97;">${res.difficulty}</span>
-                        </div>
-                        <div style="color:#ccc;font-size:0.8rem;margin-bottom:4px;">${res.provider} · ${res.duration}</div>
-                        <div style="color:#888;font-size:0.75rem;">🎯 ${res.relevance || res.skill}</div>
-                    </a>
-                </div>
-            `).join('') : '<p style="color:#888;">暂无免费资源推荐</p>';
+            // 使用从 recommendations 提取的 allFreeResources
+            if (allFreeResources.length > 0) {
+                freeList.innerHTML = allFreeResources.map(res => `
+                    <div class="resource-item" data-url="${res.url}" style="position:relative;">
+                        <a href="${res.url}" target="_blank" style="display:block;padding:14px;background:rgba(107,207,127,0.1);border:1px solid rgba(107,207,127,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" 
+                           onmouseover="this.style.borderColor='rgba(107,207,127,0.6)'" 
+                           onmouseout="this.style.borderColor='rgba(107,207,127,0.3)'">
+                            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                                <span style="font-size:0.9rem;">📚</span>
+                                <span style="color:#6fcf97;font-weight:600;">${res.title}</span>
+                                <span style="background:rgba(107,207,127,0.3);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#6fcf97;">${res.level || '免费'}</span>
+                            </div>
+                            <div style="color:#aaa;font-size:0.75rem;">🎯 技能：${res.skill || ''} · ${res.desc || ''}</div>
+                        </a>
+                    </div>
+                `).join('');
+            } else {
+                freeList.innerHTML = '<p style="color:#888;">暂无免费资源推荐</p>';
+            }
             
             // 3. 显示付费资源
             const paidSection = document.getElementById('paidResourcesSection');
             const paidList = document.getElementById('paidResourcesList');
-            if (data.paid_resources && data.paid_resources.length > 0) {
+            // 使用从 recommendations 提取的 allPaidResources
+            if (allPaidResources.length > 0) {
                 paidSection.classList.remove('hidden');
-                paidList.innerHTML = data.paid_resources.map(res => `
+                paidList.innerHTML = allPaidResources.map(res => `
                     <a href="${res.url}" target="_blank" style="display:block;padding:14px;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.3);border-radius:8px;text-decoration:none;transition:all 0.3s;color:#fff;" 
                        onmouseover="this.style.borderColor='rgba(255,215,0,0.6)'" 
                        onmouseout="this.style.borderColor='rgba(255,215,0,0.3)'">
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
                             <span style="font-size:0.9rem;">💎</span>
                             <span style="color:#ffd700;font-weight:600;">${res.title}</span>
-                            ${res.cost ? `<span style="background:rgba(255,215,0,0.3);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#ffd700;">${res.cost}</span>` : ''}
+                            ${res.price_hint ? `<span style="background:rgba(255,215,0,0.3);padding:2px 8px;border-radius:10px;font-size:0.7rem;color:#ffd700;">${res.price_hint}</span>` : ''}
                         </div>
-                        <div style="color:#ccc;font-size:0.8rem;margin-bottom:4px;">${res.provider} · ${res.duration}</div>
-                        <div style="color:#888;font-size:0.75rem;">${res.value_proposition || res.skill}</div>
+                        <div style="color:#aaa;font-size:0.75rem;">🎯 技能：${res.skill || ''} · ${res.desc || ''}</div>
                     </a>
                 `).join('');
             } else {
                 paidSection.classList.add('hidden');
             }
             
-            // 显示快速行动
+            // 4. 生成快速行动建议（从 recommendations 提取）
             const quickWinsList = document.getElementById('quickWinsList');
-            quickWinsList.innerHTML = (data.quick_wins || []).map(action => `
-                <div style="padding:10px 14px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:8px;color:#fff;font-size:0.9rem;">
-                    ⚡ ${action}
-                </div>
-            `).join('') || '<p style="color:#888;">暂无快速行动建议</p>';
+            const quickWins = [];
+            recs.forEach(r => {
+                if (r.free && r.free.length > 0) {
+                    quickWins.push(`从「${r.skill}」开始：先看免费教程，建立基础认知`);
+                }
+            });
+            if (quickWins.length > 0) {
+                quickWinsList.innerHTML = quickWins.map(action => `
+                    <div style="padding:10px 14px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);border-radius:8px;color:#fff;font-size:0.9rem;">
+                        ⚡ ${action}
+                    </div>
+                `).join('');
+            } else {
+                quickWinsList.innerHTML = '<p style="color:#888;">暂无快速行动建议</p>';
+            }
             
             // 自动验证链接有效性
             validateResourceLinks();

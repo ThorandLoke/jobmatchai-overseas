@@ -1,12 +1,101 @@
 """
 JobMatchAI - 智能学习资源推荐引擎
 根据用户缺失技能，匹配合适的学习资源（免费 + 付费）
+
+策略：
+1. 先查硬编码数据库（速度快，精选优质资源）
+2. 命中 → 直接返回
+3. 未命中 → 调用 AI（Groq/OpenAI）动态生成学习资源
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import re
+import json
+import sys
+import os
+
+router = APIRouter(prefix="/learning", tags=["智能学习推荐"])
+
+# ============================================================
+# AI 客户端（从 backend_main 共享，避免重复初始化）
+# ============================================================
+def get_ai_client():
+    """获取当前可用的 AI 客户端"""
+    try:
+        import backend_main as bm
+        if hasattr(bm, 'smart_ai_request'):
+            return bm.smart_ai_request
+    except Exception:
+        pass
+    return None
+
+
+async def ai_generate_resources(skill: str, job_title: str = "") -> dict:
+    """
+    用 AI 为未知技能动态生成学习资源（搜索页 URL 格式，不生成具体课程链接）
+    """
+    smart_ai = get_ai_client()
+    if not smart_ai:
+        return None
+
+    prompt = f"""你是一个职业发展顾问，需要为求职者推荐学习资源。
+
+目标职位：{job_title or '未知'}
+需要提升的技能：{skill}
+
+请生成 JSON 格式的学习资源推荐，要求：
+1. free 数组：3-4个免费资源，必须包含 B站搜索链接
+2. paid 数组：2个付费资源
+3. URL 必须用搜索页格式（不要具体课程链接，容易失效）：
+   - B站：https://search.bilibili.com/all?keyword=SKILL（替换SKILL为中文关键词）
+   - Coursera：https://www.coursera.org/search?query=SKILL
+   - Udemy：https://www.udemy.com/topic/SKILL/
+   - LinkedIn Learning：https://www.linkedin.com/learning/topics/SKILL
+   - edX：https://www.edx.org/search?q=SKILL
+   - YouTube：https://www.youtube.com/results?search_query=SKILL
+
+只返回 JSON，不要其他文字：
+{{
+  "category": "技能分类名称（英文小写，如 python / data-analysis / project-management）",
+  "industry": "所属行业（如 IT、金融、保险、医疗等）",
+  "free": [
+    {{"title": "B站 - {skill}系列教程", "type": "视频", "url": "https://search.bilibili.com/all?keyword={skill}", "desc": "简短说明", "level": "入门"}},
+    {{"title": "YouTube - {skill} Tutorial", "type": "视频", "url": "https://www.youtube.com/results?search_query={skill}+tutorial", "desc": "简短说明", "level": "入门"}},
+    {{"title": "Coursera - {skill}", "type": "课程", "url": "https://www.coursera.org/search?query={skill}", "desc": "简短说明", "level": "入门→进阶"}}
+  ],
+  "paid": [
+    {{"title": "Udemy - {skill}课程", "type": "在线课", "url": "https://www.udemy.com/topic/{skill}/", "desc": "简短说明", "level": "进阶", "price_hint": "¥60-200"}},
+    {{"title": "LinkedIn Learning - {skill}", "type": "在线课", "url": "https://www.linkedin.com/learning/topics/{skill}", "desc": "简短说明", "level": "进阶", "price_hint": "月订阅"}}
+  ]
+}}"""
+
+    try:
+        response = smart_ai(
+            messages=[{"role": "user", "content": prompt}],
+            preferred_provider="groq",
+            max_tokens=800,
+            temperature=0.3
+        )
+        content = response.choices[0].message.content.strip()
+        # 提取 JSON
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].split("```")[0].strip()
+        data = json.loads(content)
+        return {
+            "skill": skill,
+            "category": data.get("category", skill.lower().replace(" ", "-")),
+            "industry": data.get("industry", ""),
+            "free": data.get("free", []),
+            "paid": data.get("paid", []),
+            "ai_generated": True
+        }
+    except Exception as e:
+        print(f"[AI Learning] 生成失败 for '{skill}': {e}")
+        return None
 
 router = APIRouter(prefix="/learning", tags=["智能学习推荐"])
 
@@ -377,23 +466,31 @@ def match_skill_to_category(skill: str) -> Optional[str]:
     """将用户输入的技能关键词，匹配到数据库中的分类"""
     skill_lower = skill.lower().strip()
 
+    def word_match(a: str, b: str) -> bool:
+        """使用单词边界判断 a 是否出现在 b 中（避免 'ai' 匹配 'supply chain'）"""
+        # 用 \b 单词边界做精确词匹配
+        pattern = r'\b' + re.escape(a) + r'\b'
+        return bool(re.search(pattern, b))
+
+    # 第一轮：单词边界精确匹配
     for category, data in LEARNING_DATABASE.items():
         for kw in data.get("keywords", []):
-            if kw.lower() in skill_lower or skill_lower in kw.lower():
+            kw_lower = kw.lower()
+            if word_match(kw_lower, skill_lower) or word_match(skill_lower, kw_lower):
                 return category
 
-    # 第二轮：包含匹配（处理复合词）
+    # 第二轮：包含匹配（处理复合词，仅限长于3个字母的词）
     for category, data in LEARNING_DATABASE.items():
         for kw in data.get("keywords", []):
             kw_parts = kw.lower().split()
-            if any(part in skill_lower for part in kw_parts if len(part) > 3):
+            if any(word_match(part, skill_lower) for part in kw_parts if len(part) > 3):
                 return category
 
     return None
 
 
 def get_resources_for_skill(skill: str) -> dict:
-    """获取单个技能的学习资源"""
+    """获取单个技能的学习资源（查硬编码数据库）"""
     category = match_skill_to_category(skill)
 
     if category and category in LEARNING_DATABASE:
@@ -403,19 +500,31 @@ def get_resources_for_skill(skill: str) -> dict:
             "industry": LEARNING_DATABASE[category].get("industry", ""),
             "free": LEARNING_DATABASE[category]["resources"]["free"],
             "paid": LEARNING_DATABASE[category]["resources"]["paid"],
+            "ai_generated": False
         }
 
-    # 未能精确匹配，返回通用建议
+    # 未命中 → 返回 None，让调用者决定是否用 AI
+    return None
+
+
+def get_fallback_resources(skill: str) -> dict:
+    """最终兜底：纯搜索链接（不需要 AI，100% 可用）"""
+    skill_encoded = skill.replace(' ', '%20')
+    skill_bilibili = skill  # B站搜索用原始词
     return {
         "skill": skill,
-        "category": None,
+        "category": "general",
         "industry": "",
         "free": [
-            {"title": f"搜索「{skill}」系统学习", "type": "搜索", "url": f"https://www.google.com/search?q={skill.replace(' ', '+')}+学习+课程", "desc": "在搜索引擎中查找最相关的学习资源", "level": "通用"},
+            {"title": f"B站 - {skill}教程", "type": "视频", "url": f"https://search.bilibili.com/all?keyword={skill_bilibili}", "desc": "B站海量中文教学视频", "level": "入门"},
+            {"title": f"YouTube - {skill} Tutorial", "type": "视频", "url": f"https://www.youtube.com/results?search_query={skill_encoded}+tutorial", "desc": "英文视频教程", "level": "入门"},
+            {"title": f"Coursera - {skill}", "type": "课程", "url": f"https://www.coursera.org/search?query={skill_encoded}", "desc": "顶尖大学在线课程", "level": "入门→进阶"},
         ],
         "paid": [
-            {"title": f"Coursera - {skill}相关课程", "type": "证书课", "url": f"https://www.coursera.org/search?query={skill.replace(' ', '%20')}", "desc": "顶尖大学在线课程平台", "level": "通用", "price_hint": "免费旁听"},
+            {"title": f"Udemy - {skill}课程", "type": "在线课", "url": f"https://www.udemy.com/topic/{skill_encoded}/", "desc": "实操导向课程", "level": "进阶", "price_hint": "¥60-200"},
+            {"title": f"LinkedIn Learning - {skill}", "type": "在线课", "url": f"https://www.linkedin.com/learning/topics/{skill_encoded}", "desc": "职业向技能课程", "level": "进阶", "price_hint": "月订阅"},
         ],
+        "ai_generated": False
     }
 
 
@@ -443,10 +552,7 @@ class LearningRecommendResponse(BaseModel):
 async def recommend_learning(req: LearningRecommendRequest):
     """
     根据缺失技能，推荐定制化学习资源
-
-    - missing_skills: 从简历-职位匹配分析中提取的缺失技能列表
-    - job_title: 目标职位（用于上下文）
-    - industry: 行业（可选）
+    策略：硬编码数据库命中 → 直接返回；未命中 → AI 动态生成
     """
     if not req.missing_skills:
         return LearningRecommendResponse(
@@ -457,25 +563,44 @@ async def recommend_learning(req: LearningRecommendRequest):
         )
 
     recommendations = []
+    ai_needed = []   # 需要 AI 处理的技能
+
+    # 第一轮：查硬编码数据库
     for skill in req.missing_skills:
         skill_clean = re.sub(r'[\s\-–—]+', ' ', skill.strip())
         if len(skill_clean) < 2:
             continue
         rec = get_resources_for_skill(skill_clean)
-        recommendations.append(rec)
+        if rec:
+            recommendations.append(rec)
+        else:
+            ai_needed.append(skill_clean)
 
-    # 生成AI学习建议摘要
+    # 第二轮：AI 批量生成未命中的技能
+    if ai_needed:
+        import asyncio
+        tasks = [ai_generate_resources(skill, req.job_title or "") for skill in ai_needed]
+        ai_results = await asyncio.gather(*tasks)
+        for skill, result in zip(ai_needed, ai_results):
+            if result:
+                recommendations.append(result)
+            else:
+                # AI 也失败了 → 用搜索链接兜底
+                recommendations.append(get_fallback_resources(skill))
+
+    # AI 总结
     industries = [r.get("industry", "") for r in recommendations if r.get("industry")]
     industry_text = "、".join(set(industries)) if industries else "通用职场"
     skill_names = "、".join(req.missing_skills[:5])
     if len(req.missing_skills) > 5:
         skill_names += f" 等{len(req.missing_skills)}项技能"
+    ai_count = sum(1 for r in recommendations if r.get("ai_generated"))
 
     ai_summary = (
         f"根据您的求职目标（{req.job_title or '目标职位'}），"
-        f"建议重点补充以下{industry_text}领域的知识和技能：{skill_names}。"
-        f"免费资源可快速入门，付费课程系统深入。优先选择带实操练习的内容，"
-        f"学完后记得更新简历，在LinkedIn上展示新技能，会大大提高面试邀请率！"
+        f"建议重点补充：{skill_names}。"
+        f"B站有大量中文教程，Coursera可获国际认证。"
+        f"优先选择带实操练习的内容，完成后记得更新简历！"
     )
 
     return LearningRecommendResponse(

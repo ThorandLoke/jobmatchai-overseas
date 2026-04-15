@@ -582,14 +582,59 @@ CRITICAL RULES:
         # 获取国内学习资源（AI驱动）
         chinese_resources = get_chinese_learning_resources_ai(missing_skills, lang)
         
+        # 构建 recommendations 数组格式（兼容前端）
+        recommendations = []
+        free_resources = result.get('free_resources', [])[:5]
+        paid_resources = result.get('paid_resources', [])[:3]
+        quick_wins = result.get('quick_wins', [])
+        
+        # 按技能分组
+        for skill in missing_skills[:5]:
+            skill_lower = skill.lower()
+            # 找对应的免费资源
+            skill_free = [r for r in free_resources if skill_lower in r.get('skill', '').lower()]
+            # 找对付费的资源
+            skill_paid = [r for r in paid_resources if skill_lower in r.get('skill', '').lower()]
+            # 找B站资源
+            skill_chinese = [r for r in chinese_resources if skill_lower in r.get('skill', '').lower()]
+            
+            # 分配资源（确保每个技能都有展示机会）
+            if not skill_free:
+                skill_free = free_resources[:1] if free_resources else []
+            if not skill_paid:
+                skill_paid = paid_resources[:1] if paid_resources else []
+            
+            if skill_free or skill_paid or skill_chinese:
+                recommendations.append({
+                    'skill': skill,
+                    'category': '通用',
+                    'free': skill_free,
+                    'paid': skill_paid,
+                    'chinese': skill_chinese,
+                    'ai_generated': True
+                })
+        
+        # 如果没有按技能分组的结果，直接添加资源
+        if not recommendations:
+            recommendations.append({
+                'skill': missing_skills[0] if missing_skills else '通用技能',
+                'category': '通用',
+                'free': free_resources,
+                'paid': paid_resources,
+                'chinese': chinese_resources,
+                'ai_generated': True
+            })
+        
         return {
             'success': True,
             'summary': result.get('summary', ''),
-            'free_resources': result.get('free_resources', [])[:5],
-            'paid_resources': result.get('paid_resources', [])[:3],
-            'chinese_resources': chinese_resources,  # 新增国内资源
-            'quick_wins': result.get('quick_wins', []),
-            'skill_gaps_addressed': missing_skills[:5]
+            'ai_summary': result.get('summary', ''),
+            'free_resources': free_resources,
+            'paid_resources': paid_resources,
+            'chinese_resources': chinese_resources,
+            'quick_wins': quick_wins,
+            'skill_gaps_addressed': missing_skills[:5],
+            'recommendations': recommendations  # 前端期望的格式
         }
         
     except Exception as e:
@@ -635,14 +680,30 @@ def recommend_learning_resources_fallback(skill_gap: Dict, lang: str = 'en') -> 
         }
     ]
     
+    # 构建 recommendations 格式
+    recommendations = [
+        {
+            'skill': skill,
+            'category': '通用',
+            'free': generic_free,
+            'paid': [],
+            'chinese': [],
+            'ai_generated': False
+        }
+        for skill in (missing_skills[:3] if missing_skills else ['通用技能'])
+    ]
+    
     return {
-        'success': False,
-        'summary': 'AI unavailable. Showing general resources.',
+        'success': True,
+        'summary': 'Showing general resources. AI-powered recommendations unavailable.',
+        'ai_summary': 'Showing general resources. AI-powered recommendations unavailable.',
         'free_resources': generic_free,
         'paid_resources': [],
+        'chinese_resources': [],
         'quick_wins': ['Add missing keywords to resume', 'Quantify achievements'],
         'priority_order': missing_skills[:5] if missing_skills else ['Update your skills section'],
-        'skill_gaps_addressed': missing_skills[:5]
+        'skill_gaps_addressed': missing_skills[:5],
+        'recommendations': recommendations
     }
 
 
@@ -3282,19 +3343,42 @@ async def get_learning_recommendations(
     resume_structure: Dict = None,
     job_description: str = "",
     skill_gap: Dict = None,
-    lang: str = "en"
+    lang: str = "en",
+    # 支持前端简化的参数格式
+    missing_skills: List[str] = None,
+    job_title: str = "",
+    language: str = "en"
 ):
     """根据简历结构和技能差距推荐个性化学习资源
     
     Args:
-        resume_structure: 解析后的简历结构化数据
+        resume_structure: 解析后的简历结构化数据（完整格式）
         job_description: 职位描述
-        skill_gap: 技能差距分析结果
+        skill_gap: 技能差距分析结果（完整格式）
         lang: 语言 (zh/en)
+        # 以下为简化的前端参数
+        missing_skills: 缺失技能列表（简化格式）
+        job_title: 职位名称（简化格式）
+        language: 语言（简化格式）
     """
     try:
+        # 处理简化的前端参数格式
         if not resume_structure:
-            return {"success": False, "error": "Resume structure is required"}
+            # 前端使用简化参数，构建 skill_gap
+            if missing_skills is not None:
+                resume_structure = {}  # 空简历结构，使用技能差距驱动
+                skill_gap = {
+                    "missing_skills": missing_skills,
+                    "critical_gaps": [],
+                    "matched_skills": [],
+                    "job_title": job_title,
+                    "reasoning": ""
+                }
+                # 使用简化参数中的 language
+                if language:
+                    lang = language
+            else:
+                return {"success": False, "error": "Missing required parameters"}
         
         if not skill_gap:
             skill_gap = {
