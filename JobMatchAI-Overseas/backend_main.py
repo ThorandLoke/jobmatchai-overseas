@@ -6763,6 +6763,16 @@ async def app_en_page():
     """Frontend page - English version"""
     return FileResponse(os.path.join(FRONTEND_DIR, "index-en.html"))
 
+@app.get("/en")
+async def en_shortcut():
+    """Shortcut for /app-en"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-en.html"))
+
+@app.get("/zh")
+async def zh_shortcut():
+    """Shortcut for /app-zh"""
+    return FileResponse(os.path.join(FRONTEND_DIR, "index-zh.html"))
+
 @app.get("/app-zh")
 async def app_zh_page():
     """前端页面 - 中文版"""
