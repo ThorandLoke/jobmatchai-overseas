@@ -1035,9 +1035,16 @@ except Exception as e:
 app = FastAPI(title="JobMatchAI Nordic API", version="2.0.0")
 
 # CORS配置 - 明确允许的域名（allow_credentials=True时不能用*）
+ALLOWED_ORIGINS = [
+    "https://job-match-ai.com",
+    "https://jobmatchai.net",
+    "https://jobmatchai-4y1.pages.dev",
+    "http://localhost:8080",
+    "http://localhost:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

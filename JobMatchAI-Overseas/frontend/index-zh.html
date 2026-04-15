@@ -23,7 +23,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
         // ⚙️ API 配置
         // API Key 由后端管理，前端不需要
         const API_KEY = '';
-        const API_BASE = 'https://jobmatchai-overseas.onrender.com';
+        const API_BASE = 'https://api.jobmatchai.net';
     </script>
     
     <style>
@@ -1657,13 +1657,13 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             
             try {
                 const params = new URLSearchParams({
-                    keyword: encodeURIComponent(keyword),  // URL 编码，支持中文
+                    keyword: keyword,  // URLSearchParams 自动编码
                     country: country,
-                    location: encodeURIComponent(city),   // URL 编码
+                    location: city,   // URLSearchParams 自动编码
                     limit: 15
                 });
                 
-                const res = await fetch(`/jobs/search?${params}`);
+                const res = await fetch(API_BASE + '/jobs/search?' + params);
                 const data = await res.json();
                 
                 // 完成动画
