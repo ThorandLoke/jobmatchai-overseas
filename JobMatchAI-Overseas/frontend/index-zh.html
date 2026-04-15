@@ -6216,20 +6216,16 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             const allFreeResources = [];
             const chineseResources = []; // B站资源单独存放
             recs.forEach(r => {
-                // B站资源在 r.chinese 字段
-                if (r.chinese && Array.isArray(r.chinese)) {
-                    r.chinese.forEach(res => {
-                        chineseResources.push({
-                            ...res,
-                            skill: r.skill // 关联到技能
-                        });
-                    });
-                }
                 // 免费资源在 r.free 字段
                 if (r.free && Array.isArray(r.free)) {
                     r.free.forEach(res => {
-                        // 排除B站资源（已在 chineseResources 中）
-                        if (!res.url || !res.url.includes('bilibili.com')) {
+                        // B站资源单独存放
+                        if (res.url && res.url.includes('bilibili.com')) {
+                            chineseResources.push({
+                                ...res,
+                                skill: r.skill // 关联到技能
+                            });
+                        } else {
                             allFreeResources.push({
                                 ...res,
                                 skill: r.skill // 关联到技能
