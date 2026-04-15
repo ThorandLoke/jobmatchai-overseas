@@ -507,25 +507,43 @@ def get_resources_for_skill(skill: str) -> dict:
     return None
 
 
-def get_fallback_resources(skill: str) -> dict:
+def get_fallback_resources(skill: str, lang: str = 'en') -> dict:
     """最终兜底：纯搜索链接（不需要 AI，100% 可用）"""
     skill_encoded = skill.replace(' ', '%20')
-    skill_bilibili = skill  # B站搜索用原始词
-    return {
-        "skill": skill,
-        "category": "general",
-        "industry": "",
-        "free": [
-            {"title": f"B站 - {skill}教程", "type": "视频", "url": f"https://search.bilibili.com/all?keyword={skill_bilibili}", "desc": "B站海量中文教学视频", "level": "入门"},
-            {"title": f"YouTube - {skill} Tutorial", "type": "视频", "url": f"https://www.youtube.com/results?search_query={skill_encoded}+tutorial", "desc": "英文视频教程", "level": "入门"},
-            {"title": f"Coursera - {skill}", "type": "课程", "url": f"https://www.coursera.org/search?query={skill_encoded}", "desc": "顶尖大学在线课程", "level": "入门→进阶"},
-        ],
-        "paid": [
-            {"title": f"Udemy - {skill}课程", "type": "在线课", "url": f"https://www.udemy.com/topic/{skill_encoded}/", "desc": "实操导向课程", "level": "进阶", "price_hint": "¥60-200"},
-            {"title": f"LinkedIn Learning - {skill}", "type": "在线课", "url": f"https://www.linkedin.com/learning/topics/{skill_encoded}", "desc": "职业向技能课程", "level": "进阶", "price_hint": "月订阅"},
-        ],
-        "ai_generated": False
-    }
+    
+    if lang == 'zh':
+        return {
+            "skill": skill,
+            "category": "general",
+            "industry": "",
+            "free": [
+                {"title": f"B站 - {skill}教程", "type": "视频", "url": f"https://search.bilibili.com/all?keyword={skill}", "desc": "B站海量中文教学视频", "level": "入门"},
+                {"title": f"YouTube - {skill} Tutorial", "type": "视频", "url": f"https://www.youtube.com/results?search_query={skill_encoded}+tutorial", "desc": "英文视频教程", "level": "入门"},
+                {"title": f"Coursera - {skill}", "type": "课程", "url": f"https://www.coursera.org/search?query={skill_encoded}", "desc": "顶尖大学在线课程", "level": "入门→进阶"},
+            ],
+            "paid": [
+                {"title": f"Udemy - {skill}课程", "type": "在线课", "url": f"https://www.udemy.com/topic/{skill_encoded}/", "desc": "实操导向课程", "level": "进阶", "price_hint": "¥60-200"},
+                {"title": f"LinkedIn Learning - {skill}", "type": "在线课", "url": f"https://www.linkedin.com/learning/topics/{skill_encoded}", "desc": "职业向技能课程", "level": "进阶", "price_hint": "月订阅"},
+            ],
+            "ai_generated": False
+        }
+    else:
+        # English fallback - no Bilibili
+        return {
+            "skill": skill,
+            "category": "general",
+            "industry": "",
+            "free": [
+                {"title": f"YouTube - {skill} Tutorial", "type": "视频", "url": f"https://www.youtube.com/results?search_query={skill_encoded}+tutorial", "desc": "Free video tutorials", "level": "Beginner"},
+                {"title": f"Coursera - {skill}", "type": "课程", "url": f"https://www.coursera.org/search?query={skill_encoded}", "desc": "Top university courses", "level": "Beginner → Intermediate"},
+                {"title": f"edX - {skill}", "type": "课程", "url": f"https://www.edx.org/search?q={skill_encoded}", "desc": "Free online courses from MIT, Harvard", "level": "Beginner → Advanced"},
+            ],
+            "paid": [
+                {"title": f"Udemy - {skill} Course", "type": "在线课", "url": f"https://www.udemy.com/topic/{skill_encoded}/", "desc": "Hands-on practical courses", "level": "Intermediate", "price_hint": "$10-20"},
+                {"title": f"LinkedIn Learning - {skill}", "type": "在线课", "url": f"https://www.linkedin.com/learning/topics/{skill_encoded}", "desc": "Professional skill courses", "level": "Advanced", "price_hint": "Monthly subscription"},
+            ],
+            "ai_generated": False
+        }
 
 
 # ============================================================
@@ -572,6 +590,10 @@ async def recommend_learning(req: LearningRecommendRequest):
             continue
         rec = get_resources_for_skill(skill_clean)
         if rec:
+            # English mode: remove Bilibili from hardcoded results
+            if req.language != 'zh':
+                rec['free'] = [r for r in rec.get('free', []) if 'bilibili' not in r.get('url', '').lower()]
+                rec['paid'] = [r for r in rec.get('paid', []) if 'bilibili' not in r.get('url', '').lower()]
             recommendations.append(rec)
         else:
             ai_needed.append(skill_clean)
@@ -583,10 +605,13 @@ async def recommend_learning(req: LearningRecommendRequest):
         ai_results = await asyncio.gather(*tasks)
         for skill, result in zip(ai_needed, ai_results):
             if result:
+                # English mode: remove Bilibili from AI results
+                if req.language != 'zh':
+                    result['free'] = [r for r in result.get('free', []) if 'bilibili' not in r.get('url', '').lower()]
                 recommendations.append(result)
             else:
-                # AI 也失败了 → 用搜索链接兜底
-                recommendations.append(get_fallback_resources(skill))
+                # AI 也失败了 → 用搜索链接兜底（传入语言参数）
+                recommendations.append(get_fallback_resources(skill, req.language or 'en'))
 
     # AI 总结
     industries = [r.get("industry", "") for r in recommendations if r.get("industry")]
@@ -596,12 +621,20 @@ async def recommend_learning(req: LearningRecommendRequest):
         skill_names += f" 等{len(req.missing_skills)}项技能"
     ai_count = sum(1 for r in recommendations if r.get("ai_generated"))
 
-    ai_summary = (
-        f"根据您的求职目标（{req.job_title or '目标职位'}），"
-        f"建议重点补充：{skill_names}。"
-        f"B站有大量中文教程，Coursera可获国际认证。"
-        f"优先选择带实操练习的内容，完成后记得更新简历！"
-    )
+    if req.language == 'zh':
+        ai_summary = (
+            f"根据您的求职目标（{req.job_title or '目标职位'}），"
+            f"建议重点补充：{skill_names}。"
+            f"B站有大量中文教程，Coursera可获国际认证。"
+            f"优先选择带实操练习的内容，完成后记得更新简历！"
+        )
+    else:
+        ai_summary = (
+            f"For your target position ({req.job_title or 'target role'}), "
+            f"focus on improving: {skill_names}. "
+            f"Coursera offers internationally recognized certificates. "
+            f"Prioritize hands-on courses and remember to update your resume after completion!"
+        )
 
     return LearningRecommendResponse(
         success=True,
