@@ -2027,7 +2027,7 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                             </div>
                     `;
                     
-                    // 学习建议（如果有）
+                    // 学习建议（如果有）- AI 生成的建议
                     if (analysis.learning_recommendations && analysis.learning_recommendations.length > 0) {
                         html += `<div style="margin-top: 12px;"><label style="color: #00d4ff; font-size: 0.9rem;">💡 推荐学习：</label>`;
                         html += '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">';
@@ -2045,6 +2045,14 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         html += '</div></div>';
                     }
                     
+                    // 加载真实学习资源（异步）
+                    html += `<div id="skillGapLearningResources" style="margin-top: 12px;">
+                        <label style="color: #6fcf97; font-size: 0.9rem;">🎯 学习资源样例：</label>
+                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                            <div style="color: #888; font-size: 0.85rem;">⏳ 正在加载学习资源...</div>
+                        </div>
+                    </div>`;
+                    
                     // 去学习按钮
                     html += `
                             <div style="margin-top: 14px; text-align: center;">
@@ -2055,6 +2063,11 @@ Copyright © 2026 JobMatchAI. All rights reserved.
                         </div>
                     `;
                 }
+                
+                // 异步加载学习资源
+                setTimeout(() => {
+                    loadLearningResourcesForSkillGap(analysis.missing_skills || []);
+                }, 100);
                 
                 // 职位申请技巧（如果有）
                 if (analysis.job_specific_tips && analysis.job_specific_tips.length > 0) {
@@ -5263,6 +5276,117 @@ Copyright © 2026 JobMatchAI. All rights reserved.
             }, 100);
         }
 
+        // 为 Skill Gap 分析加载真实学习资源样例
+        async function loadLearningResourcesForSkillGap(missingSkills) {
+            const container = document.getElementById('skillGapLearningResources');
+            if (!container || missingSkills.length === 0) return;
+            
+            try {
+                const response = await fetch(API_BASE + '/api/learning/recommend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        missing_skills: missingSkills,
+                        job_title: window.currentAnalysis?.job_context?.job_title || '',
+                        language: 'zh'
+                    })
+                });
+                
+                const data = await response.json();
+                if (!data.success) {
+                    container.innerHTML = `<div style="color: #888; font-size: 0.85rem;">暂无可用学习资源</div>`;
+                    return;
+                }
+                
+                let html = `<label style="color: #6fcf97; font-size: 0.9rem;">🎯 学习资源样例：</label>`;
+                html += `<div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">`;
+                
+                // B站资源（优先级最高）- 只展示一个
+                if (data.chinese_resources && data.chinese_resources.length > 0) {
+                    const bilibili = data.chinese_resources[0];
+                    html += `
+                        <a href="${bilibili.url}" target="_blank" style="
+                            display: flex; align-items: center; gap: 10px;
+                            background: rgba(251, 105, 153, 0.15);
+                            border: 1px solid rgba(251, 105, 153, 0.4);
+                            border-radius: 8px; padding: 8px 12px;
+                            text-decoration: none; color: inherit;
+                        ">
+                            <span style="font-size: 1.2rem;">📺</span>
+                            <div style="flex: 1;">
+                                <div style="color: #fb7299; font-weight: 600; font-size: 0.9rem;">B站 · ${bilibili.title || '推荐学习'}</div>
+                                <div style="color: #888; font-size: 0.8rem;">${bilibili.skill || missingSkills[0]} · ${bilibili.difficulty || '中级'}</div>
+                            </div>
+                            <span style="color: #fb7299;">→</span>
+                        </a>
+                    `;
+                }
+                
+                // Coursera 免费资源 - 只展示一个
+                if (data.free_resources && data.free_resources.length > 0) {
+                    const coursera = data.free_resources.find(r => r.provider?.toLowerCase().includes('coursera')) || data.free_resources[0];
+                    if (coursera) {
+                        html += `
+                            <a href="${coursera.url}" target="_blank" style="
+                                display: flex; align-items: center; gap: 10px;
+                                background: rgba(0, 82, 204, 0.15);
+                                border: 1px solid rgba(0, 82, 204, 0.4);
+                                border-radius: 8px; padding: 8px 12px;
+                                text-decoration: none; color: inherit;
+                            ">
+                                <span style="font-size: 1.2rem;">🎓</span>
+                                <div style="flex: 1;">
+                                    <div style="color: #0052cc; font-weight: 600; font-size: 0.9rem;">${coursera.provider || 'Coursera'} · ${coursera.title || '免费课程'}</div>
+                                    <div style="color: #888; font-size: 0.8rem;">${missingSkills[0]} · ${coursera.difficulty || 'Beginner'}</div>
+                                </div>
+                                <span style="color: #0052cc;">→</span>
+                            </a>
+                        `;
+                    }
+                }
+                
+                // 付费资源（如果有）- 只展示一个
+                if (data.paid_resources && data.paid_resources.length > 0) {
+                    const paid = data.paid_resources[0];
+                    html += `
+                        <a href="${paid.url}" target="_blank" style="
+                            display: flex; align-items: center; gap: 10px;
+                            background: rgba(255, 149, 0, 0.15);
+                            border: 1px solid rgba(255, 149, 0, 0.4);
+                            border-radius: 8px; padding: 8px 12px;
+                            text-decoration: none; color: inherit;
+                        ">
+                            <span style="font-size: 1.2rem;">💎</span>
+                            <div style="flex: 1;">
+                                <div style="color: #ff9500; font-weight: 600; font-size: 0.9rem;">${paid.provider || 'Udemy'} · ${paid.title || '精品课程'}</div>
+                                <div style="color: #888; font-size: 0.8rem;">${missingSkills[0]} · ${paid.difficulty || 'Intermediate'}</div>
+                            </div>
+                            <span style="color: #ff9500;">→</span>
+                        </a>
+                    `;
+                }
+                
+                // 提示更多资源
+                const totalResources = (data.chinese_resources?.length || 0) + (data.free_resources?.length || 0) + (data.paid_resources?.length || 0);
+                if (totalResources > 3) {
+                    html += `
+                        <div style="text-align: center; margin-top: 4px;">
+                            <span style="color: #00d4ff; font-size: 0.85rem; cursor: pointer;" onclick="goToLearning()">
+                                📚 前往学习资源查看全部 ${totalResources} 个课程推荐
+                            </span>
+                        </div>
+                    `;
+                }
+                
+                html += `</div>`;
+                container.innerHTML = html;
+                
+            } catch (error) {
+                console.error('加载学习资源失败:', error);
+                container.innerHTML = `<div style="color: #888; font-size: 0.85rem;">加载学习资源失败</div>`;
+            }
+        }
+        
         // 跳转到学习资源 Tab 并传递缺失技能
         function goToLearning() {
             // 获取当前分析的缺失技能和完整数据
