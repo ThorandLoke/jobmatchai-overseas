@@ -1,6 +1,6 @@
 """
 JobMatchAI - 数据库模块
-使用 SQLite 存储用户、简历、职位、申请记录、求职信数据
+使用 Turso (SQLite 兼容) 云端数据库
 
 表结构：
 - users: 用户表
@@ -9,28 +9,30 @@ JobMatchAI - 数据库模块
 - applications: 申请记录表
 - cover_letters: 求职信表
 
+本地开发：USE_LOCAL_SQLITE=true → 本地 SQLite
+生产部署：USE_LOCAL_SQLITE=false → Turso 云端
+
 Copyright © 2026 JobMatchAI. All rights reserved.
 """
 
-import sqlite3
 import os
 import json
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from contextlib import contextmanager
 
-# 数据库文件路径
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "jobmatchai.db")
-
-# 确保 data 目录存在
-os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-
-
-def get_db_connection():
-    """获取数据库连接"""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# 优先从 turso_client 导入（支持本地/云端自动切换）
+try:
+    from turso_client import get_db_connection
+except ImportError:
+    # 如果 turso_client 不可用，回退到本地 sqlite3（不应在生产环境发生）
+    import sqlite3
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data", "jobmatchai.db")
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    def get_db_connection():
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 @contextmanager
@@ -206,7 +208,7 @@ def init_database():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_data_session ON session_data(session_id)")
         
         conn.commit()
-        print(f"✅ 数据库初始化完成: {DB_PATH}")
+        print("✅ 数据库初始化完成（" + ("本地 SQLite" if os.environ.get("USE_LOCAL_SQLITE","true")=="true" else "Turso 云端") + "）")
 
 
 def generate_id(prefix: str) -> str:

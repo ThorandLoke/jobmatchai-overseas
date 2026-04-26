@@ -15,8 +15,13 @@ import os
 import re
 import io
 import json
+import sqlite3
 import jwt
 import unicodedata
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 import asyncio
 import threading
 
@@ -2479,6 +2484,14 @@ async def upload_resume(file: UploadFile = File(...)):
         text = parse_resume(content, file.filename)
         lang = detect_language(text)
         
+        # 检查是否成功提取到文本
+        if not text or len(text.strip()) < 50:
+            return {
+                "success": False,
+                "filename": file.filename,
+                "error": f"无法解析文件格式（{file.filename}）。请上传 PDF、DOCX 或 TXT 文件"
+            }
+        
         # 使用 AI 进行结构化解析
         parsed_structure = parse_resume_structure(text, lang)
         
@@ -2984,9 +2997,10 @@ async def search_jobs(
     keyword: str = "",
     country: str = "all",
     location: str = "",
-    limit: int = 10
+    limit: int = 10,
+    resume_text: str = ""  # 新增：可选简历文本，用于计算匹配分
 ):
-    """统一职位搜索 API
+    """统一职位搜索 API（v5：支持匹配评分）
     
     支持的 country 参数:
     - all: 搜索所有来源（英国、澳大利亚、加拿大、法国、荷兰、比利时、美国、德国）
@@ -2998,6 +3012,10 @@ async def search_jobs(
     - be: 比利时 (Adzuna)
     - us: 美国 (Adzuna)
     - de: 德国 (Arbeitsagentur)
+    
+    resume_text 参数（可选）:
+    - 如果提供，系统会为每个职位计算「匹配度评分」(0-10)
+    - 低于 4.0 分的职位标记为「不建议投递」
     """
     all_jobs = []
     
@@ -3019,12 +3037,75 @@ async def search_jobs(
         else:
             return {"success": False, "error": f"不支持的国家: {country}"}
         
+        raw_jobs = all_jobs[:limit * 3] if country == "all" else all_jobs
+        
+        # === v5: 如果提供了简历文本，为每个职位计算匹配度 ===
+        if resume_text and AI_AVAILABLE and len(resume_text) > 20:
+            scored_jobs = []
+            for job in raw_jobs:
+                job_desc = job.get("description", "") or ""
+                job_title = job.get("title", "") or ""
+                
+                # 使用 AI 分析匹配度（复用 analyze_skill_gap_ai）
+                gap_result = analyze_skill_gap_ai(
+                    resume_text=resume_text,
+                    job_description=job_desc,
+                    job_title=job_title,
+                    detected_skills=None,
+                    lang="en"
+                )
+                
+                # AI 返回 1-100，转换为 0-10
+                raw_score = gap_result.get("score", 50)
+                match_score = round(raw_score / 10, 1)  # e.g. 75 → 7.5
+                match_score = max(0.0, min(10.0, match_score))
+                
+                # 匹配等级
+                if match_score >= 8.0:
+                    match_level = "high"
+                    match_label = "高度匹配"
+                    recommend = True
+                elif match_score >= 6.0:
+                    match_level = "medium"
+                    match_label = "匹配度良好"
+                    recommend = True
+                elif match_score >= 4.0:
+                    match_level = "low"
+                    match_label = "匹配度一般"
+                    recommend = True
+                else:
+                    match_level = "weak"
+                    match_label = "不建议投递"
+                    recommend = False
+                
+                # 添加匹配信息到职位对象
+                job["match_score"] = match_score
+                job["match_level"] = match_level
+                job["match_label"] = match_label
+                job["match_recommend"] = recommend
+                job["matched_skills"] = gap_result.get("matched_skills", [])[:3]
+                job["missing_skills"] = gap_result.get("missing_skills", [])[:3]
+                
+                scored_jobs.append(job)
+            
+            # 按匹配度排序（高匹配在前）
+            scored_jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+            
+            return {
+                "success": True,
+                "count": len(scored_jobs),
+                "jobs": scored_jobs,
+                "scored": True  # 标识：已计算匹配度
+            }
+        
         return {
             "success": True,
-            "count": len(all_jobs),
-            "jobs": all_jobs[:limit * 3] if country == "all" else all_jobs
+            "count": len(raw_jobs),
+            "jobs": raw_jobs,
+            "scored": False
         }
     except Exception as e:
+        print(f"[jobs/search] Error: {e}")
         return {"success": False, "error": str(e)}
 
 @app.get("/jobs/sources")
@@ -5251,9 +5332,13 @@ async def export_resume_pdf_endpoint(
     - polished_content: 精修后的简历内容（可选，会覆盖数据库内容）
     - user_name/user_email/user_phone/user_location: 用户信息（精修内容时需要）
     """
-    user_id = get_current_user_id(authorization)
-    if not user_id:
-        return {"success": False, "error": "Unauthorized"}
+    # 如果有精修内容，不需要认证（内容已经在请求中了）
+    if not polished_content:
+        user_id = get_current_user_id(authorization)
+        if not user_id:
+            return {"success": False, "error": "Unauthorized"}
+    else:
+        user_id = get_current_user_id(authorization) or "guest"
     
     if not PDF_ENGINE_AVAILABLE:
         return {"success": False, "error": "PDF engine not available. Please check dependencies."}
@@ -5304,6 +5389,204 @@ async def export_resume_pdf_endpoint(
         import traceback
         traceback.print_exc()
         return {"success": False, "error": str(e)}
+
+
+@app.post("/export-resume-docx")
+async def export_resume_docx_endpoint(
+    authorization: Optional[str] = Header(None),
+    resume_id: str = Form(""),
+    language: str = Form("en"),
+    mode: str = Form("filled"),   # "filled" | "blank"
+    template_type: str = Form("classic"),  # "classic" | "modern" | "creative"
+    polished_content: str = Form(""),
+    user_name: str = Form(""),
+    user_email: str = Form(""),
+    user_phone: str = Form(""),
+    user_location: str = Form(""),
+    user_title: str = Form(""),
+    user_linkedin: str = Form("")
+):
+    """导出简历为专业 Word 文档（.docx，可用 Word/WPS 编辑）
+
+    参数：
+    - mode: "blank"=空白模版（无需认证），"filled"=用数据填充（优先）
+    - template_type: "classic" | "modern" | "creative"
+    - polished_content: 精修后的简历内容（Markdown 格式，仅 filled 模式）
+    - user_name/user_email/user_phone/user_location/user_title/user_linkedin: 用户信息
+    """
+    from docx_resume import create_docx_resume, create_blank_docx_template
+    from urllib.parse import quote
+
+    # 空白模版模式：无需认证，直接生成
+    if mode == "blank":
+        try:
+            docx_bytes = create_blank_docx_template(template_type)
+            filename = f"JobMatchAI-Resume-{template_type}.docx"
+            encoded = quote(filename)
+            return StreamingResponse(
+                io.BytesIO(docx_bytes),
+                media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"}
+            )
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            return {"success": False, "error": str(e)}
+
+    # 填充模式：需要用户数据
+    if not polished_content:
+        user_id = get_current_user_id(authorization)
+        if not user_id:
+            return {"success": False, "error": "Unauthorized"}
+    else:
+        user_id = get_current_user_id(authorization) or "guest"
+
+    try:
+        # 解析 polished_content (Markdown) 为结构化数据
+        if polished_content:
+            resume_data = {
+                "name": user_name or "Your Name",
+                "title": user_title or "",
+                "email": user_email or "",
+                "phone": user_phone or "",
+                "location": user_location or "",
+                "linkedin": user_linkedin or "",
+                "content": polished_content
+            }
+        else:
+            if resume_id:
+                resume_data_db = get_resume_by_id(resume_id)
+            else:
+                resume_data_db = get_primary_resume(user_id)
+
+            if not resume_data_db:
+                return {"success": False, "error": "Resume not found"}
+
+            resume_data = {
+                "name": resume_data_db.get("title", "Your Name"),
+                "title": "",
+                "email": resume_data_db.get("email", ""),
+                "phone": resume_data_db.get("phone", ""),
+                "location": resume_data_db.get("location", ""),
+                "linkedin": "",
+                "content": resume_data_db.get("content", "")
+            }
+
+        # 解析 Markdown 内容为结构化数据
+        parsed = _parse_resume_content(resume_data.get("content", ""), language)
+
+        # 合并用户信息
+        resume_data.update(parsed)
+
+        # 生成 Word 文档
+        docx_bytes = create_docx_resume(resume_data)
+
+        filename = f"{resume_data.get('name', 'Resume').replace(' ', '_')}_Resume.docx"
+
+        return StreamingResponse(
+            io.BytesIO(docx_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{filename}"
+            }
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "error": str(e)}
+
+
+def _parse_resume_content(content: str, lang: str = 'en') -> dict:
+    """将 Markdown 格式的简历内容解析为结构化数据"""
+    if not content:
+        return {}
+
+    result = {
+        "summary": "",
+        "experience": [],
+        "education": [],
+        "skills": {}
+    }
+
+    lines = content.split('\n')
+    current_section = None
+    current_exp = None
+    current_edu = None
+
+    for line in lines:
+        line = line.strip()
+
+        # 检测章节标题
+        if line.startswith('##'):
+            current_section = line.replace('##', '').strip().lower()
+            current_exp = None
+            current_edu = None
+            continue
+
+        # 跳过图片和无关内容
+        if line.startswith('![') or line.startswith('```') or not line:
+            continue
+
+        if current_section == 'summary' or 'summary' in current_section:
+            result["summary"] += line + " "
+        elif current_section in ['experience', 'work experience', '工作经验', '工作经历']:
+            # 检测职位开始（## 职位 或 - **职位**）
+            if line.startswith('##') or (line.startswith('- **') and not current_exp):
+                if current_exp:
+                    result["experience"].append(current_exp)
+                title = line.replace('- **', '').replace('**', '').strip()
+                current_exp = {
+                    "title": title,
+                    "company": "",
+                    "date_range": "",
+                    "location": "",
+                    "description": []
+                }
+            elif current_exp:
+                if line.startswith('- '):
+                    text = line[2:].strip()
+                    if text.startswith('**'):
+                        parts = text.split('**', 2)
+                        if len(parts) >= 3:
+                            current_exp["company"] = parts[1]
+                            current_exp["date_range"] = parts[2].replace('(', '').replace(')', '').strip()
+                    else:
+                        current_exp["description"].append(text)
+        elif current_section in ['education', 'education background', '教育背景']:
+            if line.startswith('- **') or (line.startswith('##') and 'edu' in current_section):
+                if current_edu:
+                    result["education"].append(current_edu)
+                title = line.replace('- **', '').replace('**', '').strip()
+                current_edu = {"degree": title, "school": "", "date_range": ""}
+            elif current_edu and line.startswith('- '):
+                text = line[2:].strip()
+                if '@' in text or any(x in text for x in ['University', '大学', '学院', 'DTU', 'CBS']):
+                    current_edu["school"] = text
+                else:
+                    current_edu["date_range"] = text
+        elif current_section == 'skills' or 'skill' in current_section:
+            # 技能分类
+            if line.startswith('**') and ':' in line:
+                cat = line.replace('**', '').replace(':', '').strip()
+                current_section = f"skill_{cat}"
+                result["skills"][cat] = []
+            elif line.startswith('- ') and current_section.startswith('skill_'):
+                cat = current_section.replace('skill_', '')
+                result["skills"].setdefault(cat, [])
+                result["skills"][cat].append(line[2:].strip())
+            elif line.startswith('- '):
+                result["skills"].setdefault("Other", [])
+                result["skills"]["Other"].append(line[2:].strip())
+
+    # 保存最后一条
+    if current_exp:
+        result["experience"].append(current_exp)
+    if current_edu:
+        result["education"].append(current_edu)
+
+    # 清理
+    result["summary"] = result["summary"].strip()
+
+    return result
 
 
 # === 求职信管理 API ===
@@ -7280,6 +7563,292 @@ def get_salary(
         "disclaimer": salary_data.get("disclaimer_en", "")
     }
 
+
+# === LinkedIn 主动拓展消息生成 ===
+@app.post("/linkedin/outreach")
+async def generate_linkedin_outreach(
+    resume_text: str = Form(""),
+    job_title: str = Form(""),
+    company: str = Form(""),
+    person_name: str = Form(""),
+    person_role: str = Form(""),
+    language: str = Form("en")
+):
+    """生成 LinkedIn 主动拓展消息（简短、专业的 InMail）
+    
+    适用于：
+    - 主动联系招聘经理
+    - 询问职位开放
+    - networking 拓展人脉
+    """
+    try:
+        # 构建提示词
+        if language == "zh":
+            prompt = f"""生成一条专业的 LinkedIn 主动拓展消息。
+
+要求：
+- 简短精炼（100-150字）
+- 语气友好、专业
+- 突出候选人亮点
+- 包含明确的行动呼吁
+- 不要编造不存在的经历
+
+候选人背景：
+{resume_text[:500] if resume_text else '有相关工作经验'}
+
+目标公司：{company}
+目标职位：{job_title}
+联系人：{person_name}（{person_role}）
+
+直接输出消息内容，不要解释。"""
+        else:
+            prompt = f"""Generate a professional LinkedIn outreach message.
+
+Requirements:
+- Concise (100-150 words)
+- Friendly, professional tone
+- Highlight candidate's key strengths
+- Clear call to action
+- Do not fabricate experiences
+
+Candidate background:
+{resume_text[:500] if resume_text else 'Has relevant work experience'}
+
+Target company: {company}
+Target role: {job_title}
+Contact: {person_name} ({person_role})
+
+Output only the message content, no explanations."""
+
+        if AI_AVAILABLE:
+            response = smart_ai_request(
+                messages=[
+                    {"role": "system", "content": "You are a professional career coach helping with LinkedIn outreach messages. Output only the message text, no explanations or JSON."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=300
+            )
+            message = response.choices[0].message.content.strip() if response else None
+        else:
+            # Fallback 消息
+            if language == "zh":
+                message = f"""您好 {person_name}，
+
+我在 LinkedIn 上看到贵公司 {job_title} 的招聘信息，对这个职位非常感兴趣。
+
+我有丰富的相关经验，相信能为团队带来价值。期待有机会进一步交流！
+
+祝好"""
+            else:
+                message = f"""Hi {person_name or 'there'},
+
+I came across the {job_title} role at {company} on LinkedIn and am very interested in this opportunity.
+
+With my relevant experience, I believe I could bring value to your team. Would love to connect and discuss further!
+
+Best regards"""
+
+        return {
+            "success": True,
+            "message": message,
+            "disclaimer": "Please review and personalize the message before sending."
+        }
+    except Exception as e:
+        logger.error(f"LinkedIn outreach generation failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+# === Interview Story Bank（面试故事库）===
+
+def get_stories_db():
+    """获取故事数据库连接"""
+    db_path = os.path.join(os.path.dirname(__file__), "data", "jobmatchai.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.get("/stories")
+async def get_stories(user_id: str = "default", category: str = ""):
+    """获取故事列表"""
+    conn = get_stories_db()
+    try:
+        if category:
+            stories = conn.execute(
+                "SELECT * FROM interview_stories WHERE user_id=? AND category=? ORDER BY updated_at DESC",
+                (user_id, category)
+            ).fetchall()
+        else:
+            stories = conn.execute(
+                "SELECT * FROM interview_stories WHERE user_id=? ORDER BY updated_at DESC",
+                (user_id,)
+            ).fetchall()
+        return {"success": True, "stories": [dict(s) for s in stories]}
+    finally:
+        conn.close()
+
+@app.get("/stories/{story_id}")
+async def get_story(story_id: int):
+    """获取单个故事"""
+    conn = get_stories_db()
+    try:
+        story = conn.execute(
+            "SELECT * FROM interview_stories WHERE id=?",
+            (story_id,)
+        ).fetchone()
+        if story:
+            return {"success": True, "story": dict(story)}
+        return {"success": False, "error": "故事不存在"}
+    finally:
+        conn.close()
+
+@app.post("/stories")
+async def create_story(
+    user_id: str = Form("default"),
+    title: str = Form(...),
+    category: str = Form("通用"),
+    situation: str = Form(""),
+    task: str = Form(""),
+    action: str = Form(""),
+    result: str = Form(""),
+    reflection: str = Form(""),
+    tags: str = Form("")
+):
+    """创建故事"""
+    conn = get_stories_db()
+    try:
+        cursor = conn.execute(
+            """INSERT INTO interview_stories 
+               (user_id, title, category, situation, task, action, result, reflection, tags)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (user_id, title, category, situation, task, action, result, reflection, tags)
+        )
+        conn.commit()
+        story_id = cursor.lastrowid
+        story = conn.execute("SELECT * FROM interview_stories WHERE id=?", (story_id,)).fetchone()
+        return {"success": True, "story": dict(story)}
+    finally:
+        conn.close()
+
+@app.put("/stories/{story_id}")
+async def update_story(
+    story_id: int,
+    user_id: str = Form("default"),
+    title: str = Form(...),
+    category: str = Form("通用"),
+    situation: str = Form(""),
+    task: str = Form(""),
+    action: str = Form(""),
+    result: str = Form(""),
+    reflection: str = Form(""),
+    tags: str = Form("")
+):
+    """更新故事"""
+    conn = get_stories_db()
+    try:
+        conn.execute(
+            """UPDATE interview_stories SET 
+               title=?, category=?, situation=?, task=?, action=?, result=?, reflection=?, tags=?,
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?""",
+            (title, category, situation, task, action, result, reflection, tags, story_id, user_id)
+        )
+        conn.commit()
+        story = conn.execute("SELECT * FROM interview_stories WHERE id=?", (story_id,)).fetchone()
+        if story:
+            return {"success": True, "story": dict(story)}
+        return {"success": False, "error": "故事不存在"}
+    finally:
+        conn.close()
+
+@app.delete("/stories/{story_id}")
+async def delete_story(story_id: int, user_id: str = "default"):
+    """删除故事"""
+    conn = get_stories_db()
+    try:
+        conn.execute("DELETE FROM interview_stories WHERE id=? AND user_id=?", (story_id, user_id))
+        conn.commit()
+        return {"success": True}
+    finally:
+        conn.close()
+
+@app.post("/stories/generate")
+async def generate_stories_from_resume(
+    resume_text: str = Form(...),
+    user_id: str = Form("default")
+):
+    """从简历生成 STAR 故事"""
+    if not AI_AVAILABLE:
+        return {"success": False, "error": "AI 服务暂不可用"}
+    
+    prompt = f"""基于以下简历，生成 3-5 个 STAR 格式的面试故事。
+STAR格式：Situation（情境）、Task（任务）、Action（行动）、Result（结果）
+每个故事需要有反思（Reflection）部分。
+
+简历内容：
+{resume_text[:3000]}
+
+请以 JSON 格式返回，格式如下：
+{{
+  "stories": [
+    {{
+      "title": "故事标题（10字内）",
+      "category": "分类（团队合作/解决问题/技术挑战/领导力/其他）",
+      "situation": "描述当时的情境和背景",
+      "task": "你的任务是什么",
+      "action": "你采取了什么行动",
+      "result": "取得了什么结果（尽量量化）",
+      "reflection": "这次经历有什么反思和收获",
+      "tags": "相关标签，用逗号分隔"
+    }}
+  ]
+}}
+
+只返回 JSON，不要其他内容。"""
+
+    try:
+        response = await groq.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        content = response.choices[0].message.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        stories_data = json.loads(content)
+        
+        # 保存到数据库
+        conn = get_stories_db()
+        saved_stories = []
+        try:
+            for story in stories_data.get("stories", []):
+                cursor = conn.execute(
+                    """INSERT INTO interview_stories 
+                       (user_id, title, category, situation, task, action, result, reflection, tags)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (user_id, story["title"], story["category"], 
+                     story.get("situation",""), story.get("task",""), 
+                     story.get("action",""), story.get("result",""),
+                     story.get("reflection",""), story.get("tags",""))
+                )
+                story_id = cursor.lastrowid
+                saved = conn.execute("SELECT * FROM interview_stories WHERE id=?", (story_id,)).fetchone()
+                saved_stories.append(dict(saved))
+            conn.commit()
+        finally:
+            conn.close()
+        
+        return {"success": True, "stories": saved_stories}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/stories/categories")
+async def get_categories():
+    """获取故事分类"""
+    return {
+        "success": True,
+        "categories": ["团队合作", "解决问题", "技术挑战", "领导力", "沟通协调", "创新改进", "通用"]
+    }
 
 # === 启动 ===
 if __name__ == "__main__":
